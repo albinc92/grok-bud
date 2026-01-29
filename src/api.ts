@@ -40,9 +40,33 @@ class GrokApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || `API request failed with status ${response.status}`
-      );
+      const apiMessage = errorData.error?.message || '';
+      
+      // Handle specific error codes with user-friendly messages
+      switch (response.status) {
+        case 400:
+          throw new Error(apiMessage || 'Bad request. Check your input and try again.');
+        case 401:
+          throw new Error('Invalid API key. Please check your key in Settings.');
+        case 402:
+          throw new Error('Insufficient credits. Please add funds at console.x.ai.');
+        case 403:
+          throw new Error('Access denied. Your API key may not have permission for this action.');
+        case 404:
+          throw new Error('Resource not found. The requested endpoint or model may not exist.');
+        case 413:
+          throw new Error('Request too large. Try reducing your message length.');
+        case 422:
+          throw new Error(apiMessage || 'Invalid request parameters.');
+        case 429:
+          throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+        case 500:
+        case 502:
+        case 503:
+          throw new Error('xAI servers are experiencing issues. Please try again later.');
+        default:
+          throw new Error(apiMessage || `Request failed (${response.status})`);
+      }
     }
 
     return response.json();
