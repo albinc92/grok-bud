@@ -284,8 +284,8 @@ export class App {
                 <option value="grok-3" ${selectedModel === 'grok-3' ? 'selected' : ''}>Grok 3</option>
                 <option value="grok-3-mini" ${selectedModel === 'grok-3-mini' ? 'selected' : ''}>Grok 3 Mini</option>
               </select>
-              <button class="btn btn-secondary" id="save-chat" ${this.chatMessages.length < 2 ? 'disabled' : ''}>
-                ${icons.heart} Save
+              <button class="btn btn-success" id="save-chat" ${this.chatMessages.length < 2 ? 'disabled' : ''}>
+                ${this.currentChatId ? icons.heartFilled : icons.heart} ${this.currentChatId ? 'Saved' : 'Save'}
               </button>
             </div>
           </div>
@@ -654,7 +654,7 @@ export class App {
               <div class="generated-image-item">
                 <img src="${img.url}" alt="Generated image ${idx + 1}" class="generated-image">
                 <div class="image-actions">
-                  <button class="btn btn-secondary btn-sm save-single-image" data-url="${img.url}" data-prompt="${img.revised_prompt || prompt}">
+                  <button class="btn btn-success btn-sm save-single-image" data-url="${img.url}" data-prompt="${img.revised_prompt || prompt}">
                     ${icons.heart} Save
                   </button>
                   <a href="${img.url}" target="_blank" class="btn btn-ghost btn-sm">
