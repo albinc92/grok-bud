@@ -409,7 +409,7 @@ img {
 }
 
 textarea.form-input {
-  resize: vertical;
+  resize: none;
   min-height: 120px;
   line-height: var(--leading-relaxed);
 }
@@ -459,7 +459,7 @@ select.form-input {
 }
 
 textarea.input {
-  resize: vertical;
+  resize: none;
   min-height: 120px;
 }
 
