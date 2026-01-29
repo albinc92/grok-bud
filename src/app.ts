@@ -297,7 +297,7 @@ export class App {
         <!-- Account Section -->
         <div class="account-widget">
           ${this.currentUser ? `
-            <div class="account-info">
+            <div class="account-info account-widget-expanded">
               <div class="account-avatar">
                 ${this.currentUser.email?.charAt(0).toUpperCase() || 'U'}
               </div>
@@ -308,11 +308,22 @@ export class App {
                 </span>
               </div>
             </div>
-            <div class="account-actions">
+            <div class="account-actions account-widget-expanded">
               <button class="btn btn-ghost btn-sm" id="sync-now" title="Sync now" ${this.isSyncing ? 'disabled' : ''}>
                 ${icons.refresh}
               </button>
               <button class="btn btn-ghost btn-sm" id="sign-out" title="Sign out">
+                ${icons.logOut}
+              </button>
+            </div>
+            <div class="account-collapsed-user account-widget-collapsed">
+              <div class="account-avatar" title="${this.currentUser.email}">
+                ${this.currentUser.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <button class="btn btn-ghost btn-icon" id="sync-now-collapsed" title="Sync now" ${this.isSyncing ? 'disabled' : ''}>
+                ${this.isSyncing ? icons.loader : icons.refresh}
+              </button>
+              <button class="btn btn-ghost btn-icon" id="sign-out-collapsed" title="Sign out">
                 ${icons.logOut}
               </button>
             </div>
@@ -1754,17 +1765,19 @@ export class App {
       });
     });
 
-    // Sync now button
-    const syncBtn = document.getElementById('sync-now');
-    syncBtn?.addEventListener('click', () => {
-      this.syncWithCloud();
+    // Sync now buttons (expanded and collapsed)
+    document.querySelectorAll('#sync-now, #sync-now-collapsed').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.syncWithCloud();
+      });
     });
 
-    // Sign out button
-    const signOutBtn = document.getElementById('sign-out');
-    signOutBtn?.addEventListener('click', async () => {
-      await authService.signOut();
-      this.showToast('Signed out', 'success');
+    // Sign out buttons (expanded and collapsed)
+    document.querySelectorAll('#sign-out, #sign-out-collapsed').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await authService.signOut();
+        this.showToast('Signed out', 'success');
+      });
     });
 
     // Close auth modal
