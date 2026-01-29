@@ -88,6 +88,16 @@ export interface VideoJob {
   completedAt?: number;
 }
 
+// Video generation stored on a post
+export interface PostVideo {
+  id: string;
+  url: string;
+  prompt: string;
+  duration: number;
+  starred: boolean;
+  createdAt: number;
+}
+
 export interface GrokModel {
   id: string;
   created: number;
@@ -110,6 +120,7 @@ export interface FavoritePost {
   response: string;
   messages?: GrokMessage[]; // Full chat history for chat type
   imageUrl?: string;
+  videos?: PostVideo[]; // Generated videos for this post
   model: string;
   createdAt: number;
   updatedAt?: number; // Track last update for chats

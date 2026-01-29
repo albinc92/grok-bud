@@ -5,6 +5,7 @@ import { videoJobManager } from './videoJobManager';
 import type { FavoritePost, GrokMessage, VideoJob } from './types';
 
 type ViewType = 'gallery' | 'chat' | 'image-gen' | 'settings' | 'post';
+type MediaViewType = 'image' | 'video';
 
 export class App {
   private currentView: ViewType = 'gallery';
@@ -13,6 +14,10 @@ export class App {
   private currentPostId: string | null = null;
   private isLoading = false;
   private sidebarCollapsed = false;
+  
+  // Post media viewer state
+  private mediaView: MediaViewType = 'image';
+  private currentVideoIndex: number = 0;
   
   // Image generation state cache
   private imageGenPrompt: string = '';
@@ -65,13 +70,17 @@ export class App {
     
     // If we're viewing the post that this job is for, refresh and notify
     if (this.currentView === 'post' && this.currentPostId === job.postId) {
-      this.refreshView();
-      
       if (job.status === 'done') {
+        // Auto-switch to video view and show the latest video
+        const post = storage.getFavorites().find(f => f.id === job.postId);
+        const videos = post?.videos || [];
+        this.mediaView = 'video';
+        this.currentVideoIndex = Math.max(0, videos.length - 1);
         this.showToast('Video generated successfully!', 'success');
       } else if (job.status === 'error') {
         this.showToast(job.errorMessage || 'Video generation failed', 'error');
       }
+      this.refreshView();
     } else if (job.status === 'done') {
       // Notify even when not viewing the post
       this.showToast('Video ready! Check the post to view it.', 'success');
@@ -648,8 +657,15 @@ export class App {
     // Get video job state from storage
     const videoJob = videoJobManager.getJobForPost(this.currentPostId);
     const isVideoGenerating = videoJob?.status === 'pending';
-    const generatedVideoUrl = videoJob?.status === 'done' ? videoJob.videoUrl : null;
     const videoError = videoJob?.status === 'error' ? videoJob.errorMessage : null;
+
+    // Get videos stored on post
+    const videos = post.videos || [];
+    const hasVideos = videos.length > 0;
+    
+    // Clamp video index to valid range
+    const videoIndex = Math.min(this.currentVideoIndex, Math.max(0, videos.length - 1));
+    const currentVideo = hasVideos ? videos[videoIndex] : null;
 
     const date = new Date(post.createdAt).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -671,8 +687,59 @@ export class App {
         </div>
         
         <div class="post-content">
-          <div class="post-image-container">
-            <img src="${post.imageUrl}" alt="Generated image" class="post-image">
+          <div class="post-media-container">
+            ${hasVideos ? `
+              <div class="media-toggle">
+                <button class="media-toggle-btn ${this.mediaView === 'image' ? 'active' : ''}" id="media-view-image">
+                  ${icons.image} Image
+                </button>
+                <button class="media-toggle-btn ${this.mediaView === 'video' ? 'active' : ''}" id="media-view-video">
+                  ${icons.video} Videos (${videos.length})
+                </button>
+              </div>
+            ` : ''}
+            
+            ${this.mediaView === 'image' || !hasVideos ? `
+              <div class="post-image-container">
+                <img src="${post.imageUrl}" alt="Generated image" class="post-image">
+              </div>
+            ` : `
+              <div class="post-video-container">
+                <video controls autoplay loop class="post-video" key="${currentVideo?.id}">
+                  <source src="${currentVideo?.url}" type="video/mp4">
+                  Your browser does not support the video tag.
+                </video>
+                
+                <div class="video-controls-overlay">
+                  <div class="video-nav">
+                    <button class="btn btn-ghost btn-icon" id="video-prev" ${videoIndex === 0 ? 'disabled' : ''}>
+                      ${icons.chevronLeft}
+                    </button>
+                    <span class="video-counter">${videoIndex + 1} / ${videos.length}</span>
+                    <button class="btn btn-ghost btn-icon" id="video-next" ${videoIndex >= videos.length - 1 ? 'disabled' : ''}>
+                      ${icons.chevronRight}
+                    </button>
+                  </div>
+                  
+                  <div class="video-actions">
+                    <button class="btn btn-ghost btn-icon" id="video-star" title="${currentVideo?.starred ? 'Unstar' : 'Star'}">
+                      ${currentVideo?.starred ? icons.starFilled : icons.star}
+                    </button>
+                    <a href="${currentVideo?.url}" download class="btn btn-ghost btn-icon" title="Download">
+                      ${icons.download}
+                    </a>
+                    <button class="btn btn-ghost btn-icon text-error" id="video-delete" title="Delete video">
+                      ${icons.trash}
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="video-info">
+                  <span class="video-duration">${currentVideo?.duration}s</span>
+                  <span class="video-prompt" title="${this.escapeHtml(currentVideo?.prompt || '')}">${this.escapeHtml(this.truncateText(currentVideo?.prompt || '', 50))}</span>
+                </div>
+              </div>
+            `}
           </div>
           
           <div class="post-details">
@@ -740,25 +807,16 @@ export class App {
                   <p class="text-error">${icons.x} ${videoError}</p>
                 </div>
               ` : ''}
-              
-              ${generatedVideoUrl ? `
-                <div class="generated-video">
-                  <video controls autoplay loop class="video-player">
-                    <source src="${generatedVideoUrl}" type="video/mp4">
-                    Your browser does not support the video tag.
-                  </video>
-                  <div class="btn-group mt-4">
-                    <a href="${generatedVideoUrl}" download class="btn btn-success w-full">
-                      ${icons.download} Download Video
-                    </a>
-                  </div>
-                </div>
-              ` : ''}
             </div>
           </div>
         </div>
       </div>
     `;
+  }
+
+  private truncateText(text: string, maxLength: number): string {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
   }
 
   private attachEventListeners(): void {
@@ -1219,7 +1277,87 @@ export class App {
     backBtn?.addEventListener('click', () => {
       this.currentPostId = null;
       this.currentView = 'gallery';
+      this.mediaView = 'image';
+      this.currentVideoIndex = 0;
       this.refreshView();
+    });
+
+    // Media view toggle
+    const mediaImageBtn = document.getElementById('media-view-image');
+    mediaImageBtn?.addEventListener('click', () => {
+      this.mediaView = 'image';
+      this.refreshView();
+    });
+
+    const mediaVideoBtn = document.getElementById('media-view-video');
+    mediaVideoBtn?.addEventListener('click', () => {
+      this.mediaView = 'video';
+      this.refreshView();
+    });
+
+    // Video navigation
+    const videoPrevBtn = document.getElementById('video-prev');
+    videoPrevBtn?.addEventListener('click', () => {
+      if (this.currentVideoIndex > 0) {
+        this.currentVideoIndex--;
+        this.refreshView();
+      }
+    });
+
+    const videoNextBtn = document.getElementById('video-next');
+    videoNextBtn?.addEventListener('click', () => {
+      const post = storage.getFavorites().find(f => f.id === this.currentPostId);
+      const videos = post?.videos || [];
+      if (this.currentVideoIndex < videos.length - 1) {
+        this.currentVideoIndex++;
+        this.refreshView();
+      }
+    });
+
+    // Video star toggle
+    const videoStarBtn = document.getElementById('video-star');
+    videoStarBtn?.addEventListener('click', () => {
+      if (!this.currentPostId) return;
+      const post = storage.getFavorites().find(f => f.id === this.currentPostId);
+      const videos = post?.videos || [];
+      const currentVideo = videos[this.currentVideoIndex];
+      if (currentVideo) {
+        storage.toggleVideoStar(this.currentPostId, currentVideo.id);
+        this.refreshView();
+      }
+    });
+
+    // Video delete
+    const videoDeleteBtn = document.getElementById('video-delete');
+    videoDeleteBtn?.addEventListener('click', async () => {
+      if (!this.currentPostId) return;
+      const post = storage.getFavorites().find(f => f.id === this.currentPostId);
+      const videos = post?.videos || [];
+      const currentVideo = videos[this.currentVideoIndex];
+      
+      if (currentVideo) {
+        const confirmed = await this.showConfirmModal({
+          title: 'Delete Video',
+          message: 'Are you sure you want to delete this video?',
+          confirmText: 'Delete',
+          confirmClass: 'btn-danger'
+        });
+        
+        if (confirmed) {
+          storage.removeVideoFromPost(this.currentPostId, currentVideo.id);
+          // Adjust index if we deleted the last video
+          const remainingVideos = (storage.getFavorites().find(f => f.id === this.currentPostId)?.videos || []).length;
+          if (this.currentVideoIndex >= remainingVideos) {
+            this.currentVideoIndex = Math.max(0, remainingVideos - 1);
+          }
+          // If no videos left, switch back to image view
+          if (remainingVideos === 0) {
+            this.mediaView = 'image';
+          }
+          this.refreshView();
+          this.showToast('Video deleted', 'success');
+        }
+      }
     });
 
     // Copy prompt
@@ -1248,6 +1386,8 @@ export class App {
           storage.removeFavorite(this.currentPostId);
           this.currentPostId = null;
           this.currentView = 'gallery';
+          this.mediaView = 'image';
+          this.currentVideoIndex = 0;
           this.refreshView();
           this.showToast('Image deleted', 'success');
         }

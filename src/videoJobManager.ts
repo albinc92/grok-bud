@@ -139,7 +139,18 @@ class VideoJobManager {
       this.attemptCounts.set(job.id, attempts + 1);
 
       if (status.status === 'done' && status.video?.url) {
-        // Success!
+        // Success! Save video to the post
+        try {
+          storage.addVideoToPost(job.postId, {
+            url: status.video.url,
+            prompt: job.prompt,
+            duration: job.duration
+          });
+          console.log('[VideoJobManager] Video saved to post:', job.postId);
+        } catch (e) {
+          console.error('[VideoJobManager] Failed to save video to post:', e);
+        }
+
         const updatedJob: VideoJob = {
           ...job,
           status: 'done',

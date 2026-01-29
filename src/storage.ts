@@ -1,4 +1,4 @@
-import type { FavoritePost, AppState, UsageRecord, UsageStats, VideoJob } from './types';
+import type { FavoritePost, AppState, UsageRecord, UsageStats, VideoJob, PostVideo } from './types';
 
 const STORAGE_KEY = 'grok-bud-state';
 
@@ -63,6 +63,47 @@ export function updateFavorite(id: string, updates: Partial<FavoritePost>): void
     f.id === id ? { ...f, ...updates } : f
   );
   saveState({ favorites });
+}
+
+// ============================================
+// POST VIDEOS
+// ============================================
+
+export function addVideoToPost(postId: string, video: Omit<PostVideo, 'id' | 'createdAt' | 'starred'>): PostVideo {
+  const favorites = getFavorites();
+  const post = favorites.find(f => f.id === postId);
+  if (!post) throw new Error('Post not found');
+
+  const newVideo: PostVideo = {
+    ...video,
+    id: crypto.randomUUID(),
+    starred: false,
+    createdAt: Date.now()
+  };
+
+  const videos = post.videos || [];
+  videos.unshift(newVideo);
+
+  updateFavorite(postId, { videos });
+  return newVideo;
+}
+
+export function removeVideoFromPost(postId: string, videoId: string): void {
+  const post = getFavorites().find(f => f.id === postId);
+  if (!post) return;
+
+  const videos = (post.videos || []).filter(v => v.id !== videoId);
+  updateFavorite(postId, { videos });
+}
+
+export function toggleVideoStar(postId: string, videoId: string): void {
+  const post = getFavorites().find(f => f.id === postId);
+  if (!post) return;
+
+  const videos = (post.videos || []).map(v =>
+    v.id === videoId ? { ...v, starred: !v.starred } : v
+  );
+  updateFavorite(postId, { videos });
 }
 
 export function getApiKey(): string | null {
