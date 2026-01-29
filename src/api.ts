@@ -160,7 +160,33 @@ class GrokApiClient {
   }
 
   async getVideoStatus(requestId: string): Promise<VideoStatusResponse> {
-    return this.request<VideoStatusResponse>(`/videos/${requestId}`);
+    if (!this.apiKey) {
+      throw new Error('API key not configured. Please set your Grok API key in settings.');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/videos/${requestId}`, {
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+    });
+
+    // 202 means still pending
+    if (response.status === 202) {
+      return { status: 'pending' };
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `Failed to get video status (${response.status})`);
+    }
+
+    // 200 means done - response contains video object directly
+    const data = await response.json();
+    return {
+      status: 'done',
+      video: data.video,
+      model: data.model
+    };
   }
 
   // Poll for video completion
@@ -174,7 +200,7 @@ class GrokApiClient {
       const status = await this.getVideoStatus(requestId);
       
       if (onProgress) {
-        onProgress(status.status);
+        onProgress(status.status || 'pending');
       }
       
       if (status.status === 'done') {

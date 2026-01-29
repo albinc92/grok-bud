@@ -67,10 +67,12 @@ export interface VideoGenerationResponse {
 }
 
 export interface VideoStatusResponse {
-  status: 'pending' | 'done';
+  status?: 'pending' | 'done'; // Only present when pending
   video?: {
     url: string;
+    duration?: number;
   };
+  model?: string;
 }
 
 // Background video job tracking

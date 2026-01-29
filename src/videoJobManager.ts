@@ -135,6 +135,7 @@ class VideoJobManager {
 
     try {
       const status = await grokApi.getVideoStatus(job.id);
+      console.log('[VideoJobManager] Status response for', job.id, ':', JSON.stringify(status));
       this.attemptCounts.set(job.id, attempts + 1);
 
       if (status.status === 'done' && status.video?.url) {

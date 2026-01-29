@@ -280,15 +280,6 @@ export class App {
     return tokens.toString();
   }
 
-  private formatTimeAgo(timestamp: number): string {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000);
-    if (seconds < 60) return 'just now';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ago`;
-  }
-
   private renderCurrentView(): string {
     switch (this.currentView) {
       case 'gallery':
@@ -743,16 +734,6 @@ export class App {
                   </button>
                 </div>
               </div>
-              
-              ${isVideoGenerating ? `
-                <div class="video-progress">
-                  <div class="loading">
-                    ${icons.loader}
-                    <span>Generating video in background... You can navigate away.</span>
-                  </div>
-                  <p class="text-secondary text-sm mt-2">Started ${this.formatTimeAgo(videoJob?.startedAt || Date.now())}</p>
-                </div>
-              ` : ''}
               
               ${videoError ? `
                 <div class="video-error mt-4">
