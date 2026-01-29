@@ -302,7 +302,7 @@ export class App {
         <h2>Image Generation</h2>
         <p>Create images with Grok's imagination</p>
       </div>
-      <div class="image-gen-container">
+      <section class="card stack">
         <div class="input-group">
           <label for="image-prompt">Image Prompt</label>
           <textarea 
@@ -321,15 +321,15 @@ export class App {
             <option value="3" ${imageCount === 3 ? 'selected' : ''}>3 images</option>
             <option value="4" ${imageCount === 4 ? 'selected' : ''}>4 images</option>
           </select>
-          <small class="text-muted">More images = higher cost</small>
+          <span class="input-hint">More images = higher cost</span>
         </div>
         
-        <button class="btn btn-primary" id="generate-image" ${this.isLoading ? 'disabled' : ''}>
+        <button class="btn btn-primary full-width" id="generate-image" ${this.isLoading ? 'disabled' : ''}>
           ${this.isLoading ? icons.loader : icons.sparkles}
           ${this.isLoading ? 'Generating...' : 'Generate Image'}
         </button>
-        <div id="generated-image-result"></div>
-      </div>
+    </section>
+      <div id="generated-image-result"></div>
     `;
   }
 
@@ -342,8 +342,8 @@ export class App {
         <h2>Settings</h2>
         <p>Configure your Grok Bud application</p>
       </div>
-      <div class="settings-container">
-        <section class="settings-section">
+      <div class="stack-lg">
+        <section class="card stack">
           <h3>${icons.zap} API Configuration</h3>
           <div class="input-group">
             <label for="api-key">Grok API Key</label>
@@ -355,37 +355,31 @@ export class App {
               value="${apiKey || ''}"
             >
           </div>
-          <button class="btn btn-primary" id="save-api-key">
+          <button class="btn btn-primary full-width" id="save-api-key">
             ${icons.check} Save API Key
           </button>
-          ${hasApiKey ? `
-            <div class="api-key-status valid">
-              ${icons.check} API key configured
-            </div>
-          ` : `
-            <div class="api-key-status invalid">
-              ${icons.x} No API key set - Get one from <a href="https://console.x.ai/" target="_blank" style="color: inherit;">console.x.ai</a>
-            </div>
-          `}
+          <span class="input-hint ${hasApiKey ? 'text-success' : 'text-error'}">
+            ${hasApiKey ? `${icons.check} API key configured` : `${icons.x} No API key set - Get one from <a href="https://console.x.ai/" target="_blank">console.x.ai</a>`}
+          </span>
         </section>
 
-        <section class="settings-section">
+        <section class="card stack">
           <h3>${icons.zap} Usage & Costs</h3>
           ${this.renderUsageDetails()}
-          <button class="btn btn-danger mt-4" id="reset-usage">
+          <button class="btn btn-danger full-width" id="reset-usage">
             ${icons.trash} Reset Usage Stats
           </button>
         </section>
 
-        <section class="settings-section">
+        <section class="card stack">
           <h3>${icons.sparkles} About</h3>
           <p class="text-secondary">
             Grok Bud is a personal AI assistant interface powered by xAI's Grok API.
             Save your favorite conversations and generated images in a beautiful gallery.
           </p>
-          <p class="text-muted mt-3 text-sm">
+          <span class="input-hint">
             Version 1.0.0 • Built with Vite + TypeScript
-          </p>
+          </span>
         </section>
       </div>
     `;
@@ -395,7 +389,7 @@ export class App {
     const usage = storage.getUsageStats();
     
     return `
-      <div class="usage-details">
+      <div class="usage-details full-width">
         <div class="usage-grid">
           <div class="usage-card">
             <div class="usage-card-value">${this.formatTokens(usage.totalTokens)}</div>
@@ -669,7 +663,7 @@ export class App {
                 ${imagesHtml}
               </div>
               ${images.length > 1 ? `
-                <button class="btn btn-primary mt-4" id="save-all-images">
+                <button class="btn btn-primary full-width mt-4" id="save-all-images">
                   ${icons.heart} Save All to Favorites
                 </button>
               ` : ''}
@@ -712,11 +706,8 @@ export class App {
         this.showToast(`Error: ${(error as Error).message}`, 'error');
       } finally {
         this.isLoading = false;
-        const btn = document.getElementById('generate-image');
-        if (btn) {
-          btn.innerHTML = `${icons.sparkles} Generate Image`;
-          btn.removeAttribute('disabled');
-        }
+        // Refresh sidebar to update usage stats
+        this.refreshSidebar();
       }
     });
   }
@@ -786,6 +777,10 @@ export class App {
     this.updateUsageDisplay();
 
     this.attachViewListeners();
+  }
+
+  private refreshSidebar(): void {
+    this.updateUsageDisplay();
   }
 
   private updateUsageDisplay(): void {
