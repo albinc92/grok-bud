@@ -92,6 +92,18 @@ export function setImageCount(count: number): void {
   saveState({ imageCount: Math.min(4, Math.max(1, count)) });
 }
 
+export function getAspectRatio(): string {
+  const state = loadState();
+  return state.aspectRatio || '1:1';
+}
+
+export function setAspectRatio(ratio: string): void {
+  const validRatios = ['1:1', '16:9', '9:16', '4:3', '3:4'];
+  if (validRatios.includes(ratio)) {
+    saveState({ aspectRatio: ratio });
+  }
+}
+
 export function getGalleryColumns(): number {
   const state = loadState();
   return state.galleryColumns || 3;

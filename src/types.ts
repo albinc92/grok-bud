@@ -41,6 +41,7 @@ export interface ImageGenerationRequest {
   model: string;
   response_format?: 'url' | 'b64_json';
   n?: number;
+  aspect_ratio?: string; // e.g., "1:1", "16:9", "9:16", "4:3", "3:4"
 }
 
 export interface GeneratedImage {
@@ -115,6 +116,7 @@ export interface AppState {
   apiKey: string | null;
   selectedModel: string;
   imageCount: number;
+  aspectRatio: string; // e.g., "1:1", "16:9", "9:16", "4:3", "3:4"
   galleryColumns: number;
   isLoading: boolean;
   usage: UsageStats;

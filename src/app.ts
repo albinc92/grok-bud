@@ -141,6 +141,22 @@ export class App {
 
       <!-- Toast Notifications -->
       <div class="toast-container" id="toast-container"></div>
+
+      <!-- Confirmation Modal -->
+      <div class="modal-overlay" id="confirm-modal" style="display: none;">
+        <div class="modal confirm-modal">
+          <div class="modal-header">
+            <h3 id="confirm-modal-title">Confirm</h3>
+          </div>
+          <div class="modal-body">
+            <p id="confirm-modal-message"></p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" id="confirm-modal-cancel">Cancel</button>
+            <button class="btn btn-danger" id="confirm-modal-confirm">Delete</button>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -314,6 +330,7 @@ export class App {
 
   private renderImageGen(): string {
     const imageCount = storage.getImageCount();
+    const aspectRatio = storage.getAspectRatio();
     
     return `
       <div class="page-header">
@@ -331,15 +348,27 @@ export class App {
           >${this.escapeHtml(this.imageGenPrompt)}</textarea>
         </div>
         
-        <div class="input-group">
-          <label for="image-count">Number of Images</label>
-          <select class="input input-select" id="image-count">
-            <option value="1" ${imageCount === 1 ? 'selected' : ''}>1 image</option>
-            <option value="2" ${imageCount === 2 ? 'selected' : ''}>2 images</option>
-            <option value="3" ${imageCount === 3 ? 'selected' : ''}>3 images</option>
-            <option value="4" ${imageCount === 4 ? 'selected' : ''}>4 images</option>
-          </select>
-          <span class="input-hint">More images = higher cost</span>
+        <div class="row">
+          <div class="input-group flex-1">
+            <label for="image-count">Images</label>
+            <select class="input input-select" id="image-count">
+              <option value="1" ${imageCount === 1 ? 'selected' : ''}>1</option>
+              <option value="2" ${imageCount === 2 ? 'selected' : ''}>2</option>
+              <option value="3" ${imageCount === 3 ? 'selected' : ''}>3</option>
+              <option value="4" ${imageCount === 4 ? 'selected' : ''}>4</option>
+            </select>
+          </div>
+          
+          <div class="input-group flex-1">
+            <label for="aspect-ratio">Aspect Ratio</label>
+            <select class="input input-select" id="aspect-ratio">
+              <option value="1:1" ${aspectRatio === '1:1' ? 'selected' : ''}>1:1 (Square)</option>
+              <option value="16:9" ${aspectRatio === '16:9' ? 'selected' : ''}>16:9 (Landscape)</option>
+              <option value="9:16" ${aspectRatio === '9:16' ? 'selected' : ''}>9:16 (Portrait)</option>
+              <option value="4:3" ${aspectRatio === '4:3' ? 'selected' : ''}>4:3 (Classic)</option>
+              <option value="3:4" ${aspectRatio === '3:4' ? 'selected' : ''}>3:4 (Portrait)</option>
+            </select>
+          </div>
         </div>
         
         <button class="btn btn-primary full-width" id="generate-image" ${this.isLoading ? 'disabled' : ''}>
@@ -526,13 +555,21 @@ export class App {
     });
 
     document.querySelectorAll('[data-action="delete"]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const postId = (e.currentTarget as HTMLElement).dataset.postId;
-        if (postId && confirm('Delete this image?')) {
-          storage.removeFavorite(postId);
-          this.refreshView();
-          this.showToast('Image deleted', 'success');
+        if (postId) {
+          const confirmed = await this.showConfirmModal({
+            title: 'Delete Image',
+            message: 'Are you sure you want to delete this image from your favorites?',
+            confirmText: 'Delete',
+            confirmClass: 'btn-danger'
+          });
+          if (confirmed) {
+            storage.removeFavorite(postId);
+            this.refreshView();
+            this.showToast('Image deleted', 'success');
+          }
         }
       });
     });
@@ -647,14 +684,22 @@ export class App {
     });
 
     // Delete current chat
-    deleteBtn?.addEventListener('click', () => {
-      if (this.currentChatId && confirm('Delete this chat?')) {
-        storage.removeFavorite(this.currentChatId);
-        this.chatMessages = [];
-        this.currentChatId = null;
-        storage.setCurrentChatId(null);
-        this.refreshView();
-        this.showToast('Chat deleted', 'success');
+    deleteBtn?.addEventListener('click', async () => {
+      if (this.currentChatId) {
+        const confirmed = await this.showConfirmModal({
+          title: 'Delete Chat',
+          message: 'Are you sure you want to delete this chat? This cannot be undone.',
+          confirmText: 'Delete',
+          confirmClass: 'btn-danger'
+        });
+        if (confirmed) {
+          storage.removeFavorite(this.currentChatId);
+          this.chatMessages = [];
+          this.currentChatId = null;
+          storage.setCurrentChatId(null);
+          this.refreshView();
+          this.showToast('Chat deleted', 'success');
+        }
       }
     });
 
@@ -682,10 +727,16 @@ export class App {
     const generateBtn = document.getElementById('generate-image');
     const promptInput = document.getElementById('image-prompt') as HTMLTextAreaElement;
     const countSelect = document.getElementById('image-count') as HTMLSelectElement;
+    const aspectRatioSelect = document.getElementById('aspect-ratio') as HTMLSelectElement;
 
     // Save count preference
     countSelect?.addEventListener('change', () => {
       storage.setImageCount(parseInt(countSelect.value));
+    });
+
+    // Save aspect ratio preference
+    aspectRatioSelect?.addEventListener('change', () => {
+      storage.setAspectRatio(aspectRatioSelect.value);
     });
 
     // Save prompt on input
@@ -696,6 +747,7 @@ export class App {
     generateBtn?.addEventListener('click', async () => {
       const prompt = promptInput?.value.trim();
       const imageCount = parseInt(countSelect?.value || '1');
+      const aspectRatio = aspectRatioSelect?.value || '1:1';
       if (!prompt || this.isLoading) return;
 
       if (!grokApi.getApiKey()) {
@@ -710,7 +762,10 @@ export class App {
       this.refreshView();
 
       try {
-        const response = await grokApi.generateImage(prompt, 'grok-imagine-image', { n: imageCount });
+        const response = await grokApi.generateImage(prompt, 'grok-imagine-image', { 
+          n: imageCount,
+          aspect_ratio: aspectRatio
+        });
         const images = response.data;
 
         if (images.length > 0) {
@@ -833,8 +888,14 @@ export class App {
     });
 
     const resetUsageBtn = document.getElementById('reset-usage');
-    resetUsageBtn?.addEventListener('click', () => {
-      if (confirm('Reset all usage statistics?')) {
+    resetUsageBtn?.addEventListener('click', async () => {
+      const confirmed = await this.showConfirmModal({
+        title: 'Reset Usage Statistics',
+        message: 'Are you sure you want to reset all usage statistics? This cannot be undone.',
+        confirmText: 'Reset',
+        confirmClass: 'btn-danger'
+      });
+      if (confirmed) {
         storage.resetUsageStats();
         this.showToast('Usage stats reset', 'success');
         this.refreshView();
@@ -890,6 +951,68 @@ export class App {
     if (mobileTokens) mobileTokens.textContent = this.formatTokens(usage.totalTokens);
     if (mobileCost) mobileCost.textContent = `$${usage.totalCost.toFixed(4)}`;
     if (mobileRequests) mobileRequests.textContent = usage.requestCount.toString();
+  }
+
+  private showConfirmModal(options: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    confirmClass?: string;
+  }): Promise<boolean> {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('confirm-modal');
+      const titleEl = document.getElementById('confirm-modal-title');
+      const messageEl = document.getElementById('confirm-modal-message');
+      const confirmBtn = document.getElementById('confirm-modal-confirm');
+      const cancelBtn = document.getElementById('confirm-modal-cancel');
+      
+      if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn) {
+        resolve(false);
+        return;
+      }
+
+      titleEl.textContent = options.title;
+      messageEl.textContent = options.message;
+      confirmBtn.textContent = options.confirmText || 'Delete';
+      confirmBtn.className = `btn ${options.confirmClass || 'btn-danger'}`;
+      modal.style.display = 'flex';
+
+      const cleanup = () => {
+        modal.style.display = 'none';
+        confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+        cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+        modal.replaceWith(modal.cloneNode(true));
+      };
+
+      const handleConfirm = () => {
+        cleanup();
+        resolve(true);
+      };
+
+      const handleCancel = () => {
+        cleanup();
+        resolve(false);
+      };
+
+      const handleOverlayClick = (e: Event) => {
+        if (e.target === modal) {
+          handleCancel();
+        }
+      };
+
+      const handleKeydown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          handleCancel();
+        } else if (e.key === 'Enter') {
+          handleConfirm();
+        }
+      };
+
+      confirmBtn.addEventListener('click', handleConfirm);
+      cancelBtn.addEventListener('click', handleCancel);
+      modal.addEventListener('click', handleOverlayClick);
+      document.addEventListener('keydown', handleKeydown, { once: true });
+    });
   }
 
   private showToast(message: string, type: 'success' | 'error' = 'success'): void {
