@@ -171,6 +171,7 @@ export class App {
   private renderGallery(): string {
     const allFavorites = storage.getFavorites();
     const images = allFavorites.filter(f => f.type === 'image');
+    const columns = storage.getGalleryColumns();
 
     if (images.length === 0) {
       return `
@@ -187,11 +188,23 @@ export class App {
     }
 
     return `
-      <div class="page-header">
-        <h2>Image Gallery</h2>
-        <p>Your generated images (${images.length} items)</p>
+      <div class="page-header row">
+        <div class="flex-1">
+          <h2>Image Gallery</h2>
+          <p>Your generated images (${images.length} items)</p>
+        </div>
+        <div class="gallery-controls row-sm">
+          <label class="text-sm text-secondary">Columns:</label>
+          <select class="input input-select input-sm" id="gallery-columns">
+            <option value="2" ${columns === 2 ? 'selected' : ''}>2</option>
+            <option value="3" ${columns === 3 ? 'selected' : ''}>3</option>
+            <option value="4" ${columns === 4 ? 'selected' : ''}>4</option>
+            <option value="5" ${columns === 5 ? 'selected' : ''}>5</option>
+            <option value="6" ${columns === 6 ? 'selected' : ''}>6</option>
+          </select>
+        </div>
       </div>
-      <div class="gallery-grid">
+      <div class="gallery-grid" style="--gallery-columns: ${columns}">
         ${images.map(post => this.renderGalleryCard(post)).join('')}
       </div>
     `;
@@ -202,7 +215,7 @@ export class App {
 
     return `
       <article class="gallery-card" data-post-id="${post.id}">
-        <img src="${post.imageUrl}" alt="Generated image" class="card-image">
+        <img src="${post.imageUrl}" alt="Generated image" class="card-image" loading="lazy">
         <div class="card-content">
           <p class="card-prompt">${this.escapeHtml(post.prompt)}</p>
           <div class="card-footer">
@@ -505,6 +518,13 @@ export class App {
   }
 
   private attachGalleryListeners(): void {
+    // Gallery columns control
+    const columnsSelect = document.getElementById('gallery-columns') as HTMLSelectElement;
+    columnsSelect?.addEventListener('change', () => {
+      storage.setGalleryColumns(parseInt(columnsSelect.value));
+      this.refreshView();
+    });
+
     document.querySelectorAll('[data-action="delete"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();

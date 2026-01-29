@@ -92,6 +92,15 @@ export function setImageCount(count: number): void {
   saveState({ imageCount: Math.min(4, Math.max(1, count)) });
 }
 
+export function getGalleryColumns(): number {
+  const state = loadState();
+  return state.galleryColumns || 3;
+}
+
+export function setGalleryColumns(columns: number): void {
+  saveState({ galleryColumns: Math.min(6, Math.max(2, columns)) });
+}
+
 // Current chat tracking
 
 export function getCurrentChatId(): string | null {

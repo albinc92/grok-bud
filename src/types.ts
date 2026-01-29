@@ -115,6 +115,7 @@ export interface AppState {
   apiKey: string | null;
   selectedModel: string;
   imageCount: number;
+  galleryColumns: number;
   isLoading: boolean;
   usage: UsageStats;
   currentChatId: string | null; // null = new unsaved chat
