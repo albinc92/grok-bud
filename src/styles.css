@@ -189,24 +189,10 @@ img {
   align-items: center;
 }
 
-.full-width {
-  width: 100%;
-}
-
 .flex-1 {
   flex: 1;
   min-width: 0;
 }
-
-/* Margin utilities */
-.mt-2 { margin-top: var(--space-2); }
-.mt-3 { margin-top: var(--space-3); }
-.mt-4 { margin-top: var(--space-4); }
-.mt-6 { margin-top: var(--space-6); }
-.mt-8 { margin-top: var(--space-8); }
-
-.mb-2 { margin-bottom: var(--space-2); }
-.mb-4 { margin-bottom: var(--space-4); }
 
 /* Text utilities */
 .text-center { text-align: center; }
@@ -746,6 +732,34 @@ select.input {
   background: var(--color-bg-surface);
 }
 
+.card-image-container {
+  position: relative;
+}
+
+.card-video-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-video-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.card-video-spinner svg {
+  width: 32px;
+  height: 32px;
+  animation: spin 1s linear infinite;
+}
+
 .card-image-placeholder {
   width: 100%;
   aspect-ratio: 16 / 10;
@@ -1188,10 +1202,6 @@ select.input {
   margin-bottom: 0;
 }
 
-.video-gen-actions {
-  margin-top: var(--space-2);
-}
-
 .video-progress {
   margin-top: var(--space-4);
 }
@@ -1204,13 +1214,6 @@ select.input {
   width: 100%;
   border-radius: var(--radius-lg);
   background: var(--color-bg-surface);
-}
-
-.generated-video .video-gen-actions {
-  margin-top: var(--space-4);
-  justify-content: center;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
 }
 
 /* Post view responsive */

@@ -1,7 +1,8 @@
 import { icons } from './icons';
 import { grokApi } from './api';
 import * as storage from './storage';
-import type { FavoritePost, GrokMessage } from './types';
+import { videoJobManager } from './videoJobManager';
+import type { FavoritePost, GrokMessage, VideoJob } from './types';
 
 type ViewType = 'gallery' | 'chat' | 'image-gen' | 'settings' | 'post';
 
@@ -17,10 +18,6 @@ export class App {
   private imageGenPrompt: string = '';
   private imageGenResults: Array<{ url: string; revised_prompt?: string }> = [];
   private imageGenSavedUrls: Set<string> = new Set();
-  
-  // Video generation state
-  private videoGenerating = false;
-  private generatedVideoUrl: string | null = null;
 
   constructor() {
     // Initialize API key from storage
@@ -51,6 +48,35 @@ export class App {
       this.imageGenPrompt = imageGenCache.prompt;
       this.imageGenResults = imageGenCache.results;
       this.imageGenSavedUrls = new Set(imageGenCache.savedUrls);
+    }
+    
+    // Start video job manager and subscribe to updates
+    videoJobManager.start();
+    videoJobManager.onUpdate((job: VideoJob) => {
+      this.handleVideoJobUpdate(job);
+    });
+  }
+  
+  private handleVideoJobUpdate(job: VideoJob): void {
+    // Refresh gallery view to update spinner status
+    if (this.currentView === 'gallery') {
+      this.refreshView();
+    }
+    
+    // If we're viewing the post that this job is for, refresh and notify
+    if (this.currentView === 'post' && this.currentPostId === job.postId) {
+      this.refreshView();
+      
+      if (job.status === 'done') {
+        this.showToast('Video generated successfully!', 'success');
+      } else if (job.status === 'error') {
+        this.showToast(job.errorMessage || 'Video generation failed', 'error');
+      }
+    } else if (job.status === 'done') {
+      // Notify even when not viewing the post
+      this.showToast('Video ready! Check the post to view it.', 'success');
+    } else if (job.status === 'error') {
+      this.showToast(job.errorMessage || 'Video generation failed', 'error');
     }
   }
 
@@ -254,6 +280,15 @@ export class App {
     return tokens.toString();
   }
 
+  private formatTimeAgo(timestamp: number): string {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  }
+
   private renderCurrentView(): string {
     switch (this.currentView) {
       case 'gallery':
@@ -323,10 +358,22 @@ export class App {
 
   private renderGalleryCard(post: FavoritePost): string {
     const date = new Date(post.createdAt).toLocaleDateString();
+    const videoJob = videoJobManager.getJobForPost(post.id);
+    const isGeneratingVideo = videoJob?.status === 'pending';
 
     return `
       <article class="gallery-card" data-post-id="${post.id}">
-        <img src="${post.imageUrl}" alt="Generated image" class="card-image" loading="lazy">
+        <div class="card-image-container">
+          <img src="${post.imageUrl}" alt="Generated image" class="card-image" loading="lazy">
+          ${isGeneratingVideo ? `
+            <div class="card-video-overlay">
+              <div class="card-video-spinner">
+                ${icons.loader}
+                <span>Generating video...</span>
+              </div>
+            </div>
+          ` : ''}
+        </div>
         <div class="card-content">
           <p class="card-prompt">${this.escapeHtml(post.prompt)}</p>
           <div class="card-footer">
@@ -466,7 +513,7 @@ export class App {
           </div>
         </div>
         
-        <button class="btn btn-primary full-width" id="generate-image" ${this.isLoading ? 'disabled' : ''}>
+        <button class="btn btn-primary w-full" id="generate-image" ${this.isLoading ? 'disabled' : ''}>
           ${this.isLoading ? icons.loader : icons.sparkles}
           ${this.isLoading ? 'Generating...' : 'Generate Image'}
         </button>
@@ -536,7 +583,7 @@ export class App {
               value="${apiKey || ''}"
             >
           </div>
-          <button class="btn btn-primary full-width" id="save-api-key">
+          <button class="btn btn-primary w-full" id="save-api-key">
             ${icons.check} Save API Key
           </button>
           <span class="input-hint ${hasApiKey ? 'text-success' : 'text-error'}">
@@ -547,7 +594,7 @@ export class App {
         <section class="card stack">
           <h3>${icons.zap} Usage & Costs</h3>
           ${this.renderUsageDetails()}
-          <button class="btn btn-danger full-width" id="reset-usage">
+          <button class="btn btn-danger w-full" id="reset-usage">
             ${icons.trash} Reset Usage Stats
           </button>
         </section>
@@ -570,7 +617,7 @@ export class App {
     const usage = storage.getUsageStats();
     
     return `
-      <div class="usage-details full-width">
+      <div class="usage-details w-full">
         <div class="usage-grid">
           <div class="usage-card">
             <div class="usage-card-value">${this.formatTokens(usage.totalTokens)}</div>
@@ -606,6 +653,12 @@ export class App {
     if (!post || post.type !== 'image') {
       return this.renderGallery();
     }
+
+    // Get video job state from storage
+    const videoJob = videoJobManager.getJobForPost(this.currentPostId);
+    const isVideoGenerating = videoJob?.status === 'pending';
+    const generatedVideoUrl = videoJob?.status === 'done' ? videoJob.videoUrl : null;
+    const videoError = videoJob?.status === 'error' ? videoJob.errorMessage : null;
 
     const date = new Date(post.createdAt).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -659,6 +712,7 @@ export class App {
                     id="video-prompt" 
                     rows="2"
                     placeholder="Describe how you want the image to animate..."
+                    ${isVideoGenerating ? 'disabled' : ''}
                   ></textarea>
                   <span class="input-hint">Leave empty to use the original image prompt</span>
                 </div>
@@ -666,7 +720,7 @@ export class App {
                 <div class="video-gen-options">
                   <div class="input-group">
                     <label for="video-duration">Duration</label>
-                    <select class="input input-select" id="video-duration">
+                    <select class="input input-select" id="video-duration" ${isVideoGenerating ? 'disabled' : ''}>
                       <option value="5">5 seconds</option>
                       <option value="6" selected>6 seconds</option>
                       <option value="7">7 seconds</option>
@@ -683,30 +737,37 @@ export class App {
                 </div>
                 
                 <div class="btn-group">
-                  <button class="btn btn-primary btn-lg w-full" id="generate-video" ${this.videoGenerating ? 'disabled' : ''}>
-                    ${this.videoGenerating ? icons.loader : icons.video}
-                    ${this.videoGenerating ? 'Generating...' : 'Generate Video'}
+                  <button class="btn btn-primary btn-lg w-full" id="generate-video" ${isVideoGenerating ? 'disabled' : ''}>
+                    ${isVideoGenerating ? icons.loader : icons.video}
+                    ${isVideoGenerating ? 'Generating...' : 'Generate Video'}
                   </button>
                 </div>
               </div>
               
-              ${this.videoGenerating ? `
+              ${isVideoGenerating ? `
                 <div class="video-progress">
                   <div class="loading">
                     ${icons.loader}
-                    <span>Generating video... This may take a minute.</span>
+                    <span>Generating video in background... You can navigate away.</span>
                   </div>
+                  <p class="text-secondary text-sm mt-2">Started ${this.formatTimeAgo(videoJob?.startedAt || Date.now())}</p>
                 </div>
               ` : ''}
               
-              ${this.generatedVideoUrl ? `
+              ${videoError ? `
+                <div class="video-error mt-4">
+                  <p class="text-error">${icons.x} ${videoError}</p>
+                </div>
+              ` : ''}
+              
+              ${generatedVideoUrl ? `
                 <div class="generated-video">
                   <video controls autoplay loop class="video-player">
-                    <source src="${this.generatedVideoUrl}" type="video/mp4">
+                    <source src="${generatedVideoUrl}" type="video/mp4">
                     Your browser does not support the video tag.
                   </video>
-                  <div class="video-gen-actions">
-                    <a href="${this.generatedVideoUrl}" download class="btn btn-success">
+                  <div class="btn-group mt-4">
+                    <a href="${generatedVideoUrl}" download class="btn btn-success w-full">
                       ${icons.download} Download Video
                     </a>
                   </div>
@@ -805,8 +866,6 @@ export class App {
         const postId = (card as HTMLElement).dataset.postId;
         if (postId) {
           this.currentPostId = postId;
-          this.generatedVideoUrl = null;
-          this.videoGenerating = false;
           this.currentView = 'post';
           this.refreshView();
         }
@@ -1178,7 +1237,6 @@ export class App {
     const backBtn = document.getElementById('back-to-gallery');
     backBtn?.addEventListener('click', () => {
       this.currentPostId = null;
-      this.generatedVideoUrl = null;
       this.currentView = 'gallery';
       this.refreshView();
     });
@@ -1218,7 +1276,12 @@ export class App {
     // Generate video
     const generateVideoBtn = document.getElementById('generate-video');
     generateVideoBtn?.addEventListener('click', async () => {
-      if (this.videoGenerating) return;
+      // Check if there's already a pending job for this post
+      const existingJob = videoJobManager.getJobForPost(this.currentPostId || '');
+      if (existingJob?.status === 'pending') {
+        this.showToast('Video generation already in progress', 'error');
+        return;
+      }
 
       if (!grokApi.getApiKey()) {
         this.showToast('Please set your API key in Settings first', 'error');
@@ -1226,41 +1289,29 @@ export class App {
       }
 
       const post = storage.getFavorites().find(f => f.id === this.currentPostId);
-      if (!post) return;
+      if (!post || !post.imageUrl) {
+        this.showToast('No image found for video generation', 'error');
+        return;
+      }
 
       const videoPromptInput = document.getElementById('video-prompt') as HTMLTextAreaElement;
       const videoDurationSelect = document.getElementById('video-duration') as HTMLSelectElement;
       const videoPrompt = videoPromptInput?.value.trim() || post.prompt;
       const videoDuration = parseInt(videoDurationSelect?.value || '6');
 
-      this.videoGenerating = true;
-      this.generatedVideoUrl = null;
-      this.refreshView();
+      // Start the job in background
+      const job = await videoJobManager.startJob(
+        post.id,
+        videoPrompt,
+        post.imageUrl,
+        videoDuration
+      );
 
-      try {
-        // Start video generation with the image as source
-        const response = await grokApi.generateVideo(videoPrompt, {
-          image: post.imageUrl ? { url: post.imageUrl } : undefined,
-          duration: videoDuration
-        });
-
-        // Poll for completion
-        const result = await grokApi.waitForVideo(response.request_id, (status) => {
-          console.log('Video generation status:', status);
-        });
-
-        if (result.video?.url) {
-          this.generatedVideoUrl = result.video.url;
-          this.showToast('Video generated successfully!', 'success');
-        } else {
-          throw new Error('No video URL in response');
-        }
-      } catch (error) {
-        console.error('Video generation error:', error);
-        this.showToast(error instanceof Error ? error.message : 'Failed to generate video', 'error');
-      } finally {
-        this.videoGenerating = false;
+      if (job) {
+        this.showToast('Video generation started in background', 'success');
         this.refreshView();
+      } else {
+        this.showToast('Failed to start video generation', 'error');
       }
     });
   }

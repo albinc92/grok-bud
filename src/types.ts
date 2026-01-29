@@ -73,6 +73,19 @@ export interface VideoStatusResponse {
   };
 }
 
+// Background video job tracking
+export interface VideoJob {
+  id: string; // request_id from API
+  postId: string; // The post this video is for
+  prompt: string;
+  duration: number;
+  status: 'pending' | 'done' | 'error';
+  videoUrl?: string;
+  errorMessage?: string;
+  startedAt: number;
+  completedAt?: number;
+}
+
 export interface GrokModel {
   id: string;
   created: number;
@@ -142,4 +155,5 @@ export interface AppState {
   usage: UsageStats;
   currentChatId: string | null; // null = new unsaved chat
   currentPostId: string | null; // For viewing individual posts
+  videoJobs: VideoJob[]; // Background video generation jobs
 }

@@ -1,4 +1,4 @@
-import type { FavoritePost, AppState, UsageRecord, UsageStats } from './types';
+import type { FavoritePost, AppState, UsageRecord, UsageStats, VideoJob } from './types';
 
 const STORAGE_KEY = 'grok-bud-state';
 
@@ -295,4 +295,42 @@ export function resetUsageStats(): void {
       history: [],
     },
   });
+}
+
+// ============================================
+// VIDEO JOBS
+// ============================================
+
+export function getVideoJobs(): VideoJob[] {
+  const state = loadState();
+  return state.videoJobs || [];
+}
+
+export function getVideoJobForPost(postId: string): VideoJob | undefined {
+  return getVideoJobs().find(job => job.postId === postId);
+}
+
+export function getPendingVideoJobs(): VideoJob[] {
+  return getVideoJobs().filter(job => job.status === 'pending');
+}
+
+export function addVideoJob(job: VideoJob): void {
+  const jobs = getVideoJobs();
+  // Remove any existing job for the same post
+  const filtered = jobs.filter(j => j.postId !== job.postId);
+  filtered.unshift(job);
+  // Keep only last 20 jobs
+  saveState({ videoJobs: filtered.slice(0, 20) });
+}
+
+export function updateVideoJob(id: string, updates: Partial<VideoJob>): void {
+  const jobs = getVideoJobs().map(job =>
+    job.id === id ? { ...job, ...updates } : job
+  );
+  saveState({ videoJobs: jobs });
+}
+
+export function removeVideoJob(id: string): void {
+  const jobs = getVideoJobs().filter(job => job.id !== id);
+  saveState({ videoJobs: jobs });
 }
