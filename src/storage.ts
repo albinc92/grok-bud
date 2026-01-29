@@ -113,6 +113,47 @@ export function setGalleryColumns(columns: number): void {
   saveState({ galleryColumns: Math.min(6, Math.max(2, columns)) });
 }
 
+export function getSidebarCollapsed(): boolean {
+  const state = loadState();
+  return state.sidebarCollapsed || false;
+}
+
+export function setSidebarCollapsed(collapsed: boolean): void {
+  saveState({ sidebarCollapsed: collapsed });
+}
+
+// Image generation state cache (persists across HMR)
+
+export interface ImageGenCache {
+  prompt: string;
+  results: Array<{ url: string; revised_prompt?: string }>;
+  savedUrls: string[];
+}
+
+export function getImageGenCache(): ImageGenCache | null {
+  try {
+    const cached = localStorage.getItem('grok-bud-image-gen-cache');
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+export function setImageGenCache(cache: ImageGenCache): void {
+  try {
+    localStorage.setItem('grok-bud-image-gen-cache', JSON.stringify(cache));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function clearImageGenCache(): void {
+  localStorage.removeItem('grok-bud-image-gen-cache');
+}
+
 // Current chat tracking
 
 export function getCurrentChatId(): string | null {

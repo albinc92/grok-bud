@@ -10,6 +10,7 @@ export class App {
   private chatMessages: GrokMessage[] = [];
   private currentChatId: string | null = null;
   private isLoading = false;
+  private sidebarCollapsed = false;
   
   // Image generation state cache
   private imageGenPrompt: string = '';
@@ -23,6 +24,9 @@ export class App {
       grokApi.setApiKey(savedApiKey);
     }
     
+    // Restore sidebar state
+    this.sidebarCollapsed = storage.getSidebarCollapsed();
+    
     // Restore current chat if exists
     this.currentChatId = storage.getCurrentChatId();
     if (this.currentChatId) {
@@ -34,6 +38,14 @@ export class App {
         this.currentChatId = null;
         storage.setCurrentChatId(null);
       }
+    }
+    
+    // Restore image generation state (survives HMR)
+    const imageGenCache = storage.getImageGenCache();
+    if (imageGenCache) {
+      this.imageGenPrompt = imageGenCache.prompt;
+      this.imageGenResults = imageGenCache.results;
+      this.imageGenSavedUrls = new Set(imageGenCache.savedUrls);
     }
   }
 
@@ -67,7 +79,7 @@ export class App {
       </div>
 
       <!-- Desktop Sidebar -->
-      <aside class="sidebar">
+      <aside class="sidebar${this.sidebarCollapsed ? ' collapsed' : ''}" id="sidebar">
         <div class="sidebar-logo">
           <img src="/grok.svg" alt="Grok Bud">
           <h1>Grok Bud</h1>
@@ -110,10 +122,13 @@ export class App {
             </div>
           </div>
         </div>
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">
+          ${this.sidebarCollapsed ? icons.chevronRight : icons.chevronLeft}
+        </button>
       </aside>
 
       <!-- Main Content -->
-      <main class="main-content">
+      <main class="main-content${this.sidebarCollapsed ? ' sidebar-collapsed' : ''}">
         ${this.renderCurrentView()}
       </main>
 
@@ -409,10 +424,10 @@ export class App {
         ${imagesHtml}
       </div>
       <div class="row mt-4">
-        <button class="btn btn-ghost flex-1" id="regenerate-images">
+        <button class="btn btn-primary flex-1" id="regenerate-images">
           ${icons.refresh} Regenerate
         </button>
-        <button class="btn btn-primary flex-1" id="save-all-images" ${allSaved ? 'disabled' : ''}>
+        <button class="btn btn-success flex-1" id="save-all-images" ${allSaved ? 'disabled' : ''}>
           ${allSaved ? icons.heartFilled : icons.heart} ${allSaved ? 'Saved' : 'Save'} ${images.length > 1 ? 'All' : ''}
         </button>
       </div>
@@ -503,6 +518,28 @@ export class App {
   }
 
   private attachEventListeners(): void {
+    // Sidebar toggle
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    sidebarToggle?.addEventListener('click', () => {
+      this.sidebarCollapsed = !this.sidebarCollapsed;
+      storage.setSidebarCollapsed(this.sidebarCollapsed);
+      
+      const sidebar = document.getElementById('sidebar');
+      const mainContent = document.querySelector('.main-content');
+      
+      if (sidebar) {
+        sidebar.classList.toggle('collapsed', this.sidebarCollapsed);
+      }
+      if (mainContent) {
+        mainContent.classList.toggle('sidebar-collapsed', this.sidebarCollapsed);
+      }
+      
+      // Update toggle button icon
+      if (sidebarToggle) {
+        sidebarToggle.innerHTML = this.sidebarCollapsed ? icons.chevronRight : icons.chevronLeft;
+      }
+    });
+    
     // Desktop Navigation
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', (e) => {
@@ -756,9 +793,8 @@ export class App {
       }
 
       this.isLoading = true;
-      // Clear previous results when regenerating
+      // Clear previous results to show loading state
       this.imageGenResults = [];
-      this.imageGenSavedUrls.clear();
       this.refreshView();
 
       try {
@@ -768,21 +804,23 @@ export class App {
         });
         const images = response.data;
 
-        if (images.length > 0) {
-          // Cache the results
-          this.imageGenPrompt = prompt;
-          this.imageGenResults = images.map(img => ({
+        // Cache the results on successful response
+        this.imageGenPrompt = prompt;
+        this.imageGenResults = images
+          .filter(img => img.url)
+          .map(img => ({
             url: img.url!,
             revised_prompt: img.revised_prompt
           }));
-          
-          // Re-render to show cached results
-          this.isLoading = false;
-          this.refreshView();
-          this.refreshSidebar();
-        }
+        this.imageGenSavedUrls.clear();
+        
+        // Persist to localStorage (survives HMR)
+        this.saveImageGenCache();
+        
+        this.refreshSidebar();
       } catch (error) {
         this.showToast(`Error: ${(error as Error).message}`, 'error');
+      } finally {
         this.isLoading = false;
         this.refreshView();
       }
@@ -820,6 +858,7 @@ export class App {
         });
         // Track saved state
         this.imageGenSavedUrls.add(url);
+        this.saveImageGenCache();
         // Update button to show saved state
         btn.innerHTML = `${icons.heartFilled} Saved`;
         (btn as HTMLButtonElement).disabled = true;
@@ -842,6 +881,7 @@ export class App {
         // Track saved state
         this.imageGenSavedUrls.add(img.url);
       });
+      this.saveImageGenCache();
       // Update button to show saved state
       saveAllBtn.innerHTML = `${icons.heartFilled} Saved ${images.length > 1 ? 'All' : ''}`;
       (saveAllBtn as HTMLButtonElement).disabled = true;
@@ -851,6 +891,14 @@ export class App {
         (btn as HTMLButtonElement).disabled = true;
       });
       this.showToast(`Saved ${images.length} images to favorites!`, 'success');
+    });
+  }
+
+  private saveImageGenCache(): void {
+    storage.setImageGenCache({
+      prompt: this.imageGenPrompt,
+      results: this.imageGenResults,
+      savedUrls: Array.from(this.imageGenSavedUrls)
     });
   }
 

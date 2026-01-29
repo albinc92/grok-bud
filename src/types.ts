@@ -118,6 +118,7 @@ export interface AppState {
   imageCount: number;
   aspectRatio: string; // e.g., "1:1", "16:9", "9:16", "4:3", "3:4"
   galleryColumns: number;
+  sidebarCollapsed: boolean;
   isLoading: boolean;
   usage: UsageStats;
   currentChatId: string | null; // null = new unsaved chat
