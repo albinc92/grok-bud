@@ -368,10 +368,20 @@ export class App {
             <span>Settings</span>
           </button>
           ${this.currentUser ? `
-            <button class="mobile-nav-item mobile-account-btn logged-in" id="mobile-account-info">
-              <span class="mobile-account-avatar">${this.currentUser.email?.charAt(0).toUpperCase() || 'U'}</span>
-              <span>${this.isSyncing ? 'Syncing' : 'Synced'}</span>
-            </button>
+            <div class="mobile-account-wrapper">
+              <button class="mobile-nav-item mobile-account-btn" id="mobile-account-toggle">
+                <span class="mobile-account-avatar">${this.currentUser.email?.charAt(0).toUpperCase() || 'U'}</span>
+                <span>${this.isSyncing ? 'Syncing' : 'Synced'}</span>
+              </button>
+              <div class="mobile-account-popup" id="mobile-account-popup">
+                <button class="btn btn-ghost btn-icon" id="mobile-sync-btn" title="Sync now" ${this.isSyncing ? 'disabled' : ''}>
+                  ${icons.refresh}
+                </button>
+                <button class="btn btn-ghost btn-icon" id="mobile-logout-btn" title="Sign out">
+                  ${icons.logOut}
+                </button>
+              </div>
+            </div>
           ` : `
             <button class="mobile-nav-item mobile-account-btn open-auth-modal">
               ${icons.user}
@@ -1770,19 +1780,36 @@ export class App {
       });
     });
 
-    // Sync now buttons (expanded and collapsed)
-    document.querySelectorAll('#sync-now, #sync-now-collapsed').forEach(btn => {
+    // Sync now buttons (expanded, collapsed, and mobile)
+    document.querySelectorAll('#sync-now, #sync-now-collapsed, #mobile-sync-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         this.syncWithCloud();
+        document.getElementById('mobile-account-popup')?.classList.remove('open');
       });
     });
 
-    // Sign out buttons (expanded and collapsed)
-    document.querySelectorAll('#sign-out, #sign-out-collapsed').forEach(btn => {
+    // Sign out buttons (expanded, collapsed, and mobile)
+    document.querySelectorAll('#sign-out, #sign-out-collapsed, #mobile-logout-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
+        document.getElementById('mobile-account-popup')?.classList.remove('open');
         await authService.signOut();
         this.showToast('Signed out', 'success');
       });
+    });
+
+    // Mobile account popup toggle
+    const mobileAccountToggle = document.getElementById('mobile-account-toggle');
+    mobileAccountToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('mobile-account-popup')?.classList.toggle('open');
+    });
+
+    // Close mobile popup when clicking outside
+    document.addEventListener('click', (e) => {
+      const wrapper = document.querySelector('.mobile-account-wrapper');
+      if (wrapper && !wrapper.contains(e.target as Node)) {
+        document.getElementById('mobile-account-popup')?.classList.remove('open');
+      }
     });
 
     // Close auth modal
