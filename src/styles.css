@@ -233,10 +233,12 @@ img {
   display: flex;
   flex-direction: column;
   padding: var(--space-5);
+  padding-bottom: calc(var(--space-5) + 48px); /* Extra space for toggle button */
   position: fixed;
   height: 100vh;
   z-index: var(--z-sticky);
   overflow-y: auto;
+  transition: width var(--transition-base), padding var(--transition-base);
 }
 
 .sidebar-logo {
@@ -346,14 +348,10 @@ img {
 }
 
 /* Collapsed Sidebar */
-.sidebar {
-  transition: width var(--transition-base);
-  position: relative;
-}
-
 .sidebar.collapsed {
   width: 72px;
   padding: var(--space-3);
+  padding-bottom: calc(var(--space-3) + 48px);
   align-items: center;
 }
 
@@ -408,10 +406,7 @@ img {
 }
 
 .sidebar.collapsed .sidebar-toggle {
-  position: relative;
-  bottom: auto;
-  right: auto;
-  margin-top: var(--space-3);
+  position: absolute;
 }
 
 /* ============================================
@@ -1483,10 +1478,10 @@ select.input {
     font-size: var(--text-2xl);
   }
   
-  /* Gallery adjustments */
+  /* Gallery adjustments - force 1 column on mobile */
   .gallery-grid {
-    --gallery-columns: min(var(--gallery-columns), 2);
-    grid-template-columns: repeat(var(--gallery-columns), 1fr);
+    --gallery-columns: 1 !important;
+    grid-template-columns: 1fr;
     gap: var(--space-3);
   }
   

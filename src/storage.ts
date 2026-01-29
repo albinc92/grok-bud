@@ -110,7 +110,7 @@ export function getGalleryColumns(): number {
 }
 
 export function setGalleryColumns(columns: number): void {
-  saveState({ galleryColumns: Math.min(6, Math.max(2, columns)) });
+  saveState({ galleryColumns: Math.min(6, Math.max(1, columns)) });
 }
 
 export function getSidebarCollapsed(): boolean {

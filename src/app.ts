@@ -54,6 +54,71 @@ export class App {
     if (!root) throw new Error(`Element ${selector} not found`);
     root.innerHTML = this.render();
     this.attachEventListeners();
+    this.setupResizeListener();
+  }
+
+  private getMaxColumnsForWidth(width: number): number {
+    if (width < 768) return 1;      // Mobile: always 1
+    if (width < 1024) return 3;     // Tablet: max 3
+    if (width < 1440) return 4;     // Small desktop: max 4
+    return 6;                       // Large desktop: max 6
+  }
+
+  private setupResizeListener(): void {
+    let resizeTimeout: number;
+    
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = window.setTimeout(() => {
+        const maxColumns = this.getMaxColumnsForWidth(window.innerWidth);
+        const currentColumns = storage.getGalleryColumns();
+        
+        // Clamp current columns to max allowed
+        if (currentColumns > maxColumns) {
+          storage.setGalleryColumns(maxColumns);
+        }
+        
+        // Update the gallery grid and select if on gallery view
+        if (this.currentView === 'gallery') {
+          this.updateGalleryColumns();
+        }
+      }, 100);
+    };
+
+    window.addEventListener('resize', handleResize);
+    // Initial check
+    handleResize();
+  }
+
+  private updateGalleryColumns(): void {
+    const maxColumns = this.getMaxColumnsForWidth(window.innerWidth);
+    let columns = storage.getGalleryColumns();
+    
+    // Clamp to max
+    if (columns > maxColumns) {
+      columns = maxColumns;
+      storage.setGalleryColumns(columns);
+    }
+    
+    // Update the grid
+    const grid = document.querySelector('.gallery-grid') as HTMLElement;
+    if (grid) {
+      grid.style.setProperty('--gallery-columns', String(columns));
+    }
+    
+    // Update the select options
+    const select = document.getElementById('gallery-columns') as HTMLSelectElement;
+    if (select) {
+      // Rebuild options based on max
+      select.innerHTML = '';
+      for (let i = 1; i <= maxColumns; i++) {
+        const option = document.createElement('option');
+        option.value = String(i);
+        option.textContent = String(i);
+        option.selected = i === columns;
+        select.appendChild(option);
+      }
+    }
   }
 
   private render(): string {
@@ -202,7 +267,7 @@ export class App {
   private renderGallery(): string {
     const allFavorites = storage.getFavorites();
     const images = allFavorites.filter(f => f.type === 'image');
-    const columns = storage.getGalleryColumns();
+    let columns = storage.getGalleryColumns();
 
     if (images.length === 0) {
       return `
@@ -218,6 +283,18 @@ export class App {
       `;
     }
 
+    const maxColumns = this.getMaxColumnsForWidth(window.innerWidth);
+    // Clamp columns to max for current screen
+    if (columns > maxColumns) {
+      columns = maxColumns;
+      storage.setGalleryColumns(columns);
+    }
+    
+    // Generate column options dynamically
+    const columnOptions = Array.from({ length: maxColumns }, (_, i) => i + 1)
+      .map(n => `<option value="${n}" ${columns === n ? 'selected' : ''}>${n}</option>`)
+      .join('');
+
     return `
       <div class="page-header row">
         <div class="flex-1">
@@ -227,11 +304,7 @@ export class App {
         <div class="gallery-controls row-sm">
           <label class="text-sm text-secondary">Columns:</label>
           <select class="input input-select input-sm" id="gallery-columns">
-            <option value="2" ${columns === 2 ? 'selected' : ''}>2</option>
-            <option value="3" ${columns === 3 ? 'selected' : ''}>3</option>
-            <option value="4" ${columns === 4 ? 'selected' : ''}>4</option>
-            <option value="5" ${columns === 5 ? 'selected' : ''}>5</option>
-            <option value="6" ${columns === 6 ? 'selected' : ''}>6</option>
+            ${columnOptions}
           </select>
         </div>
       </div>
