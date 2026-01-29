@@ -96,44 +96,6 @@ export interface Database {
           updated_at?: string
         }
       }
-      video_jobs: {
-        Row: {
-          id: string
-          user_id: string
-          post_id: string
-          prompt: string
-          duration: number
-          status: 'pending' | 'done' | 'error'
-          video_url: string | null
-          error_message: string | null
-          started_at: string
-          completed_at: string | null
-        }
-        Insert: {
-          id: string
-          user_id: string
-          post_id: string
-          prompt: string
-          duration: number
-          status?: 'pending' | 'done' | 'error'
-          video_url?: string | null
-          error_message?: string | null
-          started_at?: string
-          completed_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          post_id?: string
-          prompt?: string
-          duration?: number
-          status?: 'pending' | 'done' | 'error'
-          video_url?: string | null
-          error_message?: string | null
-          started_at?: string
-          completed_at?: string | null
-        }
-      }
     }
     Views: {
       [_ in never]: never

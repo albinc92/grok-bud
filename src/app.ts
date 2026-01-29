@@ -1,11 +1,14 @@
 import { icons } from './icons';
 import { grokApi } from './api';
 import * as storage from './storage';
+import * as cloudStorage from './cloudStorage';
 import { videoJobManager } from './videoJobManager';
+import { authService, type AuthUser } from './auth';
 import type { FavoritePost, GrokMessage, VideoJob } from './types';
 
 type ViewType = 'gallery' | 'chat' | 'image-gen' | 'settings' | 'post';
 type MediaViewType = 'image' | 'video';
+type AuthModalMode = 'login' | 'signup' | 'magic-link' | null;
 
 export class App {
   private currentView: ViewType = 'gallery';
@@ -23,6 +26,12 @@ export class App {
   private imageGenPrompt: string = '';
   private imageGenResults: Array<{ url: string; revised_prompt?: string }> = [];
   private imageGenSavedUrls: Set<string> = new Set();
+  
+  // Auth state
+  private currentUser: AuthUser | null = null;
+  private authModalMode: AuthModalMode = null;
+  private authLoading = false;
+  private isSyncing = false;
 
   constructor() {
     // Initialize API key from storage
@@ -60,6 +69,52 @@ export class App {
     videoJobManager.onUpdate((job: VideoJob) => {
       this.handleVideoJobUpdate(job);
     });
+    
+    // Initialize auth and sync
+    this.initAuth();
+  }
+  
+  private async initAuth(): Promise<void> {
+    // Initialize auth service
+    this.currentUser = await authService.initialize();
+    
+    // Subscribe to auth changes
+    authService.onAuthChange(async (user) => {
+      this.currentUser = user;
+      this.render();
+      
+      if (user) {
+        // Sync data when user logs in
+        await this.syncWithCloud();
+      }
+    });
+    
+    // If already logged in, sync
+    if (this.currentUser) {
+      await this.syncWithCloud();
+    }
+    
+    // Re-render to show auth state
+    this.render();
+  }
+  
+  private async syncWithCloud(): Promise<void> {
+    if (this.isSyncing) return;
+    
+    try {
+      this.isSyncing = true;
+      this.render();
+      
+      await cloudStorage.performFullSync();
+      
+      this.showToast('Synced with cloud', 'success');
+    } catch (error) {
+      console.error('[App] Sync failed:', error);
+      this.showToast('Sync failed', 'error');
+    } finally {
+      this.isSyncing = false;
+      this.render();
+    }
   }
   
   private handleVideoJobUpdate(job: VideoJob): void {
@@ -227,6 +282,37 @@ export class App {
             </div>
           </div>
         </div>
+        
+        <!-- Account Section -->
+        <div class="account-widget">
+          ${this.currentUser ? `
+            <div class="account-info">
+              <div class="account-avatar">
+                ${this.currentUser.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div class="account-details">
+                <span class="account-email">${this.currentUser.email}</span>
+                <span class="account-sync">
+                  ${this.isSyncing ? `${icons.loader} Syncing...` : `${icons.cloud} Synced`}
+                </span>
+              </div>
+            </div>
+            <div class="account-actions">
+              <button class="btn btn-ghost btn-sm" id="sync-now" title="Sync now" ${this.isSyncing ? 'disabled' : ''}>
+                ${icons.refresh}
+              </button>
+              <button class="btn btn-ghost btn-sm" id="sign-out" title="Sign out">
+                ${icons.logOut}
+              </button>
+            </div>
+          ` : `
+            <button class="btn btn-primary w-full" id="open-auth-modal">
+              ${icons.user} Sign In
+            </button>
+            <p class="account-hint">Sign in to sync across devices</p>
+          `}
+        </div>
+        
         <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">
           ${this.sidebarCollapsed ? icons.chevronRight : icons.chevronLeft}
         </button>
@@ -277,6 +363,9 @@ export class App {
           </div>
         </div>
       </div>
+      
+      <!-- Auth Modal -->
+      ${this.renderAuthModal()}
     `;
   }
 
@@ -863,6 +952,9 @@ export class App {
         }
       });
     });
+
+    // Auth listeners
+    this.attachAuthListeners();
 
     // View-specific listeners
     this.attachViewListeners();
@@ -1564,6 +1656,178 @@ export class App {
     setTimeout(() => {
       toast.remove();
     }, 3000);
+  }
+
+  private renderAuthModal(): string {
+    if (!this.authModalMode) return '';
+
+    const isLogin = this.authModalMode === 'login';
+    const isSignup = this.authModalMode === 'signup';
+    const isMagicLink = this.authModalMode === 'magic-link';
+
+    return `
+      <div class="modal-overlay" id="auth-modal">
+        <div class="modal auth-modal">
+          <div class="modal-header">
+            <h2>${isLogin ? 'Sign In' : isSignup ? 'Create Account' : 'Magic Link'}</h2>
+            <button class="btn btn-ghost btn-icon" id="close-auth-modal">
+              ${icons.x}
+            </button>
+          </div>
+          
+          <div class="modal-body">
+            ${isMagicLink ? `
+              <p class="text-secondary text-sm mb-4">Enter your email and we'll send you a magic link to sign in.</p>
+            ` : ''}
+            
+            <form id="auth-form" class="auth-form">
+              <div class="input-group">
+                <label for="auth-email">Email</label>
+                <input type="email" class="input" id="auth-email" required placeholder="you@example.com">
+              </div>
+              
+              ${!isMagicLink ? `
+                <div class="input-group">
+                  <label for="auth-password">Password</label>
+                  <input type="password" class="input" id="auth-password" required placeholder="••••••••" minlength="6">
+                </div>
+              ` : ''}
+              
+              <button type="submit" class="btn btn-primary w-full" ${this.authLoading ? 'disabled' : ''}>
+                ${this.authLoading ? icons.loader : ''}
+                ${isMagicLink ? 'Send Magic Link' : isLogin ? 'Sign In' : 'Create Account'}
+              </button>
+            </form>
+            
+            <div class="auth-divider">
+              <span>or</span>
+            </div>
+            
+            ${isLogin ? `
+              <button class="btn btn-ghost w-full" id="auth-switch-magic">
+                ${icons.mail} Sign in with Magic Link
+              </button>
+              <p class="auth-switch">
+                Don't have an account? <button class="btn-link" id="auth-switch-signup">Sign up</button>
+              </p>
+            ` : isSignup ? `
+              <p class="auth-switch">
+                Already have an account? <button class="btn-link" id="auth-switch-login">Sign in</button>
+              </p>
+            ` : `
+              <button class="btn btn-ghost w-full" id="auth-switch-password">
+                Sign in with Password
+              </button>
+            `}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private attachAuthListeners(): void {
+    // Open auth modal
+    const openAuthBtn = document.getElementById('open-auth-modal');
+    openAuthBtn?.addEventListener('click', () => {
+      this.authModalMode = 'login';
+      this.render();
+    });
+
+    // Sync now button
+    const syncBtn = document.getElementById('sync-now');
+    syncBtn?.addEventListener('click', () => {
+      this.syncWithCloud();
+    });
+
+    // Sign out button
+    const signOutBtn = document.getElementById('sign-out');
+    signOutBtn?.addEventListener('click', async () => {
+      await authService.signOut();
+      this.showToast('Signed out', 'success');
+    });
+
+    // Close auth modal
+    const closeAuthBtn = document.getElementById('close-auth-modal');
+    closeAuthBtn?.addEventListener('click', () => {
+      this.authModalMode = null;
+      this.render();
+    });
+
+    // Modal overlay click to close
+    const authModal = document.getElementById('auth-modal');
+    authModal?.addEventListener('click', (e) => {
+      if (e.target === authModal) {
+        this.authModalMode = null;
+        this.render();
+      }
+    });
+
+    // Auth form submit
+    const authForm = document.getElementById('auth-form');
+    authForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const emailInput = document.getElementById('auth-email') as HTMLInputElement;
+      const passwordInput = document.getElementById('auth-password') as HTMLInputElement;
+      
+      const email = emailInput?.value.trim();
+      const password = passwordInput?.value;
+      
+      if (!email) return;
+      
+      this.authLoading = true;
+      this.render();
+      
+      try {
+        if (this.authModalMode === 'magic-link') {
+          const { error } = await authService.signInWithMagicLink(email);
+          if (error) throw error;
+          this.showToast('Check your email for the magic link!', 'success');
+          this.authModalMode = null;
+        } else if (this.authModalMode === 'login') {
+          const { error } = await authService.signIn(email, password);
+          if (error) throw error;
+          this.showToast('Welcome back!', 'success');
+          this.authModalMode = null;
+        } else if (this.authModalMode === 'signup') {
+          const { error } = await authService.signUp(email, password);
+          if (error) throw error;
+          this.showToast('Account created! Check your email to confirm.', 'success');
+          this.authModalMode = null;
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Authentication failed';
+        this.showToast(message, 'error');
+      } finally {
+        this.authLoading = false;
+        this.render();
+      }
+    });
+
+    // Switch between auth modes
+    const switchSignup = document.getElementById('auth-switch-signup');
+    switchSignup?.addEventListener('click', () => {
+      this.authModalMode = 'signup';
+      this.render();
+    });
+
+    const switchLogin = document.getElementById('auth-switch-login');
+    switchLogin?.addEventListener('click', () => {
+      this.authModalMode = 'login';
+      this.render();
+    });
+
+    const switchMagic = document.getElementById('auth-switch-magic');
+    switchMagic?.addEventListener('click', () => {
+      this.authModalMode = 'magic-link';
+      this.render();
+    });
+
+    const switchPassword = document.getElementById('auth-switch-password');
+    switchPassword?.addEventListener('click', () => {
+      this.authModalMode = 'login';
+      this.render();
+    });
   }
 
   private escapeHtml(text: string): string {

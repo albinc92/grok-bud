@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { authService } from './auth';
-import type { FavoritePost, UsageStats, VideoJob, PostVideo, GrokMessage } from './types';
+import type { FavoritePost, UsageStats, PostVideo, GrokMessage } from './types';
 import * as localStorage from './storage';
 
 /**
@@ -259,79 +259,6 @@ export async function fetchUsageFromCloud(): Promise<UsageStats | null> {
     requestCount: 0,
     history: [],
   };
-}
-
-// ============================================
-// VIDEO JOBS
-// ============================================
-
-export async function addVideoJobToCloud(job: VideoJob): Promise<void> {
-  localStorage.addVideoJob(job);
-
-  const user = authService.getUser();
-  if (!user) return;
-
-  const { error } = await supabase.from('video_jobs').insert({
-    id: job.id,
-    user_id: user.id,
-    post_id: job.postId,
-    prompt: job.prompt,
-    duration: job.duration,
-    status: job.status,
-    started_at: new Date(job.startedAt).toISOString(),
-  });
-
-  if (error) {
-    console.error('[CloudStorage] Failed to add video job:', error);
-  }
-}
-
-export async function updateVideoJobInCloud(id: string, updates: Partial<VideoJob>): Promise<void> {
-  localStorage.updateVideoJob(id, updates);
-
-  const user = authService.getUser();
-  if (!user) return;
-
-  const cloudUpdates: Record<string, unknown> = {};
-  if (updates.status !== undefined) cloudUpdates.status = updates.status;
-  if (updates.videoUrl !== undefined) cloudUpdates.video_url = updates.videoUrl;
-  if (updates.errorMessage !== undefined) cloudUpdates.error_message = updates.errorMessage;
-  if (updates.completedAt !== undefined) cloudUpdates.completed_at = new Date(updates.completedAt).toISOString();
-
-  if (Object.keys(cloudUpdates).length > 0) {
-    await supabase
-      .from('video_jobs')
-      .update(cloudUpdates)
-      .eq('id', id)
-      .eq('user_id', user.id);
-  }
-}
-
-export async function fetchPendingVideoJobsFromCloud(): Promise<VideoJob[]> {
-  const user = authService.getUser();
-  if (!user) return localStorage.getPendingVideoJobs();
-
-  const { data, error } = await supabase
-    .from('video_jobs')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('status', 'pending');
-
-  if (error || !data) {
-    return localStorage.getPendingVideoJobs();
-  }
-
-  return data.map(row => ({
-    id: row.id,
-    postId: row.post_id,
-    prompt: row.prompt,
-    duration: row.duration,
-    status: row.status as 'pending' | 'done' | 'error',
-    videoUrl: row.video_url || undefined,
-    errorMessage: row.error_message || undefined,
-    startedAt: new Date(row.started_at).getTime(),
-    completedAt: row.completed_at ? new Date(row.completed_at).getTime() : undefined,
-  }));
 }
 
 // ============================================
