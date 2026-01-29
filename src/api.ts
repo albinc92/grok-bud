@@ -49,7 +49,7 @@ class GrokApiClient {
         case 401:
           throw new Error('Invalid API key. Please check your key in Settings.');
         case 402:
-          throw new Error('Insufficient credits. Please add funds at console.x.ai.');
+          throw new Error('Insufficient credits. <a href="https://console.x.ai/" target="_blank">Add funds →</a>');
         case 403:
           throw new Error('Access denied. Your API key may not have permission for this action.');
         case 404:
