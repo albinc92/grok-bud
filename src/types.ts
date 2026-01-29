@@ -1,0 +1,87 @@
+// Grok API Types
+
+export interface GrokMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatCompletionRequest {
+  model: string;
+  messages: GrokMessage[];
+  stream?: boolean;
+  temperature?: number;
+  max_tokens?: number;
+}
+
+export interface ChatCompletionChoice {
+  index: number;
+  message: {
+    role: string;
+    content: string;
+    refusal: string | null;
+  };
+  finish_reason: string;
+}
+
+export interface ChatCompletionResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: ChatCompletionChoice[];
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface ImageGenerationRequest {
+  prompt: string;
+  model: string;
+  response_format?: 'url' | 'b64_json';
+  n?: number;
+}
+
+export interface GeneratedImage {
+  url?: string;
+  b64_json?: string;
+  revised_prompt?: string;
+}
+
+export interface ImageGenerationResponse {
+  data: GeneratedImage[];
+}
+
+export interface GrokModel {
+  id: string;
+  created: number;
+  object: string;
+  owned_by: string;
+}
+
+export interface ModelsResponse {
+  data: GrokModel[];
+  object: string;
+}
+
+// App-specific types
+
+export interface FavoritePost {
+  id: string;
+  type: 'chat' | 'image';
+  prompt: string;
+  response: string;
+  imageUrl?: string;
+  model: string;
+  createdAt: number;
+  tags: string[];
+}
+
+export interface AppState {
+  favorites: FavoritePost[];
+  currentView: 'gallery' | 'chat' | 'image-gen' | 'settings';
+  apiKey: string | null;
+  selectedModel: string;
+  isLoading: boolean;
+}
