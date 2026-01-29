@@ -787,7 +787,15 @@ select.input {
   display: flex;
   gap: var(--space-3);
   align-items: center;
-  flex-wrap: wrap;
+}
+
+.chat-controls .input-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-controls .btn {
+  flex-shrink: 0;
 }
 
 /* ============================================
@@ -796,6 +804,11 @@ select.input {
 .image-gen-container {
   max-width: var(--container-narrow);
   margin: 0 auto;
+}
+
+.image-gen-container > .btn {
+  width: 100%;
+  margin-top: var(--space-4);
 }
 
 .image-gen-options {
@@ -904,6 +917,19 @@ select.input {
 .settings-section h3 svg {
   width: 20px;
   height: 20px;
+}
+
+.settings-section .btn {
+  width: 100%;
+}
+
+.settings-section .btn-group {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.settings-section .btn-group .btn {
+  flex: 1;
 }
 
 .api-key-status {
