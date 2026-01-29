@@ -2,9 +2,6 @@
 
 A TypeScript web app for interacting with the [xAI Grok API](https://docs.x.ai/docs/api-reference). Save your favorite AI conversations and generated images in a beautiful gallery view.
 
-![Grok Bud](https://img.shields.io/badge/Vite-6.0-646CFF?logo=vite&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
-
 ## ✨ Features
 
 - **🖼️ Gallery View** - Browse and manage your favorited AI interactions
