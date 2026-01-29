@@ -1015,7 +1015,7 @@ export class App {
             confirmClass: 'btn-danger'
           });
           if (confirmed) {
-            storage.removeFavorite(postId);
+            cloudStorage.removeFavoriteFromCloud(postId);
             this.refreshView();
             this.showToast('Image deleted', 'success');
           }
@@ -1077,7 +1077,7 @@ export class App {
 
         // Update existing saved chat if we're in one
         if (this.currentChatId) {
-          storage.updateChat(this.currentChatId, this.chatMessages, model);
+          cloudStorage.updateChatInCloud(this.currentChatId, this.chatMessages, model);
         }
       } catch (error) {
         this.showToast(`Error: ${(error as Error).message}`, 'error');
@@ -1107,7 +1107,7 @@ export class App {
       storage.setSelectedModel(model);
       // If we have a current chat, update its model too
       if (this.currentChatId) {
-        storage.updateChat(this.currentChatId, this.chatMessages, model);
+        cloudStorage.updateChatInCloud(this.currentChatId, this.chatMessages, model);
       }
     });
 
@@ -1142,7 +1142,7 @@ export class App {
           confirmClass: 'btn-danger'
         });
         if (confirmed) {
-          storage.removeFavorite(this.currentChatId);
+          cloudStorage.removeFavoriteFromCloud(this.currentChatId);
           this.chatMessages = [];
           this.currentChatId = null;
           storage.setCurrentChatId(null);
@@ -1153,16 +1153,16 @@ export class App {
     });
 
     // Save chat as favorite
-    saveBtn?.addEventListener('click', () => {
+    saveBtn?.addEventListener('click', async () => {
       if (this.chatMessages.length >= 2) {
         const model = modelSelect?.value || storage.getSelectedModel();
         if (this.currentChatId) {
           // Already saved, just update
-          storage.updateChat(this.currentChatId, this.chatMessages, model);
+          cloudStorage.updateChatInCloud(this.currentChatId, this.chatMessages, model);
           this.showToast('Chat updated!', 'success');
         } else {
           // Save as new favorite
-          const newChat = storage.createChat(this.chatMessages, model);
+          const newChat = await cloudStorage.createChatInCloud(this.chatMessages, model);
           this.currentChatId = newChat.id;
           storage.setCurrentChatId(newChat.id);
           this.showToast('Chat saved!', 'success');
@@ -1260,7 +1260,7 @@ export class App {
       btn.addEventListener('click', () => {
         const url = (btn as HTMLElement).dataset.url!;
         const revisedPrompt = (btn as HTMLElement).dataset.prompt!;
-        storage.addFavorite({
+        cloudStorage.addFavoriteToCloud({
           type: 'image',
           prompt: prompt,
           response: revisedPrompt,
@@ -1282,7 +1282,7 @@ export class App {
     const saveAllBtn = document.getElementById('save-all-images');
     saveAllBtn?.addEventListener('click', () => {
       images.forEach((img, idx) => {
-        storage.addFavorite({
+        cloudStorage.addFavoriteToCloud({
           type: 'image',
           prompt: prompt,
           response: img.revised_prompt || `Generated image ${idx + 1}`,
@@ -1414,7 +1414,7 @@ export class App {
       const videos = post?.videos || [];
       const currentVideo = videos[this.currentVideoIndex];
       if (currentVideo) {
-        storage.toggleVideoStar(this.currentPostId, currentVideo.id);
+        cloudStorage.toggleVideoStarCloud(this.currentPostId, currentVideo.id);
         this.refreshView();
       }
     });
@@ -1436,7 +1436,7 @@ export class App {
         });
         
         if (confirmed) {
-          storage.removeVideoFromPost(this.currentPostId, currentVideo.id);
+          cloudStorage.removeVideoFromPostCloud(this.currentPostId, currentVideo.id);
           // Adjust index if we deleted the last video
           const remainingVideos = (storage.getFavorites().find(f => f.id === this.currentPostId)?.videos || []).length;
           if (this.currentVideoIndex >= remainingVideos) {
@@ -1475,7 +1475,7 @@ export class App {
           confirmClass: 'btn-danger'
         });
         if (confirmed) {
-          storage.removeFavorite(this.currentPostId);
+          cloudStorage.removeFavoriteFromCloud(this.currentPostId);
           this.currentPostId = null;
           this.currentView = 'gallery';
           this.mediaView = 'image';

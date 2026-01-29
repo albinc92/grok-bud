@@ -1,5 +1,6 @@
 import { grokApi } from './api';
 import * as storage from './storage';
+import * as cloudStorage from './cloudStorage';
 import type { VideoJob } from './types';
 
 type JobUpdateCallback = (job: VideoJob) => void;
@@ -141,7 +142,7 @@ class VideoJobManager {
       if (status.status === 'done' && status.video?.url) {
         // Success! Save video to the post
         try {
-          storage.addVideoToPost(job.postId, {
+          cloudStorage.addVideoToPostCloud(job.postId, {
             url: status.video.url,
             prompt: job.prompt,
             duration: job.duration
