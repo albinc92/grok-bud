@@ -3,6 +3,9 @@ import type {
   ChatCompletionResponse,
   ImageGenerationRequest,
   ImageGenerationResponse,
+  VideoGenerationRequest,
+  VideoGenerationResponse,
+  VideoStatusResponse,
   ModelsResponse,
   GrokMessage
 } from './types';
@@ -136,6 +139,52 @@ class GrokApiClient {
     } catch {
       return false;
     }
+  }
+
+  // Video Generation API
+  async generateVideo(
+    prompt: string,
+    options: Partial<VideoGenerationRequest> = {}
+  ): Promise<VideoGenerationResponse> {
+    const body: VideoGenerationRequest = {
+      prompt,
+      model: 'grok-imagine-video',
+      duration: 6,
+      ...options,
+    };
+
+    return this.request<VideoGenerationResponse>('/videos/generations', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async getVideoStatus(requestId: string): Promise<VideoStatusResponse> {
+    return this.request<VideoStatusResponse>(`/videos/${requestId}`);
+  }
+
+  // Poll for video completion
+  async waitForVideo(
+    requestId: string,
+    onProgress?: (status: string) => void,
+    maxAttempts: number = 120, // 2 minutes with 1s interval
+    intervalMs: number = 1000
+  ): Promise<VideoStatusResponse> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const status = await this.getVideoStatus(requestId);
+      
+      if (onProgress) {
+        onProgress(status.status);
+      }
+      
+      if (status.status === 'done') {
+        return status;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+    
+    throw new Error('Video generation timed out. Please try again.');
   }
 }
 

@@ -54,6 +54,25 @@ export interface ImageGenerationResponse {
   data: GeneratedImage[];
 }
 
+// Video Generation Types
+export interface VideoGenerationRequest {
+  prompt: string;
+  model: string;
+  image?: { url: string }; // Optional source image for image-to-video
+  duration?: number; // Duration in seconds (e.g., 6)
+}
+
+export interface VideoGenerationResponse {
+  request_id: string;
+}
+
+export interface VideoStatusResponse {
+  status: 'pending' | 'done';
+  video?: {
+    url: string;
+  };
+}
+
 export interface GrokModel {
   id: string;
   created: number;
@@ -112,7 +131,7 @@ export interface ModelPricing {
 
 export interface AppState {
   favorites: FavoritePost[];
-  currentView: 'gallery' | 'chat' | 'image-gen' | 'settings';
+  currentView: 'gallery' | 'chat' | 'image-gen' | 'settings' | 'post';
   apiKey: string | null;
   selectedModel: string;
   imageCount: number;
@@ -122,4 +141,5 @@ export interface AppState {
   isLoading: boolean;
   usage: UsageStats;
   currentChatId: string | null; // null = new unsaved chat
+  currentPostId: string | null; // For viewing individual posts
 }

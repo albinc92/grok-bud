@@ -3,12 +3,13 @@ import { grokApi } from './api';
 import * as storage from './storage';
 import type { FavoritePost, GrokMessage } from './types';
 
-type ViewType = 'gallery' | 'chat' | 'image-gen' | 'settings';
+type ViewType = 'gallery' | 'chat' | 'image-gen' | 'settings' | 'post';
 
 export class App {
   private currentView: ViewType = 'gallery';
   private chatMessages: GrokMessage[] = [];
   private currentChatId: string | null = null;
+  private currentPostId: string | null = null;
   private isLoading = false;
   private sidebarCollapsed = false;
   
@@ -16,6 +17,10 @@ export class App {
   private imageGenPrompt: string = '';
   private imageGenResults: Array<{ url: string; revised_prompt?: string }> = [];
   private imageGenSavedUrls: Set<string> = new Set();
+  
+  // Video generation state
+  private videoGenerating = false;
+  private generatedVideoUrl: string | null = null;
 
   constructor() {
     // Initialize API key from storage
@@ -259,6 +264,8 @@ export class App {
         return this.renderImageGen();
       case 'settings':
         return this.renderSettings();
+      case 'post':
+        return this.renderPost();
       default:
         return this.renderGallery();
     }
@@ -590,6 +597,107 @@ export class App {
     `;
   }
 
+  private renderPost(): string {
+    if (!this.currentPostId) {
+      return this.renderGallery();
+    }
+
+    const post = storage.getFavorites().find(f => f.id === this.currentPostId);
+    if (!post || post.type !== 'image') {
+      return this.renderGallery();
+    }
+
+    const date = new Date(post.createdAt).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    return `
+      <div class="post-view">
+        <div class="post-header">
+          <button class="btn btn-ghost" id="back-to-gallery">
+            ${icons.arrowLeft} Back to Gallery
+          </button>
+          <div class="post-actions">
+            <button class="btn btn-danger btn-icon" id="delete-post" title="Delete">
+              ${icons.trash}
+            </button>
+          </div>
+        </div>
+        
+        <div class="post-content">
+          <div class="post-image-container">
+            <img src="${post.imageUrl}" alt="Generated image" class="post-image">
+          </div>
+          
+          <div class="post-details">
+            <div class="post-meta">
+              <span class="post-model">${post.model}</span>
+              <span class="post-date">${date}</span>
+            </div>
+            
+            <div class="post-prompt">
+              <div class="post-prompt-header">
+                <h3>Prompt</h3>
+                <button class="btn btn-ghost btn-sm" id="copy-post-prompt" title="Copy prompt">
+                  ${icons.copy} Copy
+                </button>
+              </div>
+              <p>${this.escapeHtml(post.prompt)}</p>
+            </div>
+
+            <div class="post-video-section">
+              <h3>${icons.video} Generate Video</h3>
+              <p class="text-secondary text-sm">Transform this image into a video using Grok's video generation.</p>
+              
+              <div class="input-group">
+                <label for="video-prompt">Video Prompt (optional)</label>
+                <textarea 
+                  class="input" 
+                  id="video-prompt" 
+                  rows="2"
+                  placeholder="Describe how you want the image to animate..."
+                ></textarea>
+                <span class="input-hint">Leave empty to use the original image prompt</span>
+              </div>
+              
+              <div class="video-controls">
+                <button class="btn btn-primary" id="generate-video" ${this.videoGenerating ? 'disabled' : ''}>
+                  ${this.videoGenerating ? icons.loader : icons.video}
+                  ${this.videoGenerating ? 'Generating...' : 'Generate Video'}
+                </button>
+              </div>
+              
+              ${this.videoGenerating ? `
+                <div class="video-progress">
+                  <div class="loading">
+                    ${icons.loader}
+                    <span>Generating video... This may take a minute.</span>
+                  </div>
+                </div>
+              ` : ''}
+              
+              ${this.generatedVideoUrl ? `
+                <div class="generated-video">
+                  <video controls autoplay loop class="video-player">
+                    <source src="${this.generatedVideoUrl}" type="video/mp4">
+                    Your browser does not support the video tag.
+                  </video>
+                  <div class="video-actions">
+                    <a href="${this.generatedVideoUrl}" download class="btn btn-success">
+                      ${icons.download} Download Video
+                    </a>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   private attachEventListeners(): void {
     // Sidebar toggle
     const sidebarToggle = document.getElementById('sidebar-toggle');
@@ -653,6 +761,9 @@ export class App {
       case 'settings':
         this.attachSettingsListeners();
         break;
+      case 'post':
+        this.attachPostListeners();
+        break;
     }
   }
 
@@ -662,6 +773,23 @@ export class App {
     columnsSelect?.addEventListener('change', () => {
       storage.setGalleryColumns(parseInt(columnsSelect.value));
       this.refreshView();
+    });
+
+    // Click on gallery card to open post view
+    document.querySelectorAll('.gallery-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        // Don't navigate if clicking on action buttons
+        if ((e.target as HTMLElement).closest('[data-action]')) return;
+        
+        const postId = (card as HTMLElement).dataset.postId;
+        if (postId) {
+          this.currentPostId = postId;
+          this.generatedVideoUrl = null;
+          this.videoGenerating = false;
+          this.currentView = 'post';
+          this.refreshView();
+        }
+      });
     });
 
     document.querySelectorAll('[data-action="delete"]').forEach(btn => {
@@ -1019,6 +1147,95 @@ export class App {
       if (confirmed) {
         storage.resetUsageStats();
         this.showToast('Usage stats reset', 'success');
+        this.refreshView();
+      }
+    });
+  }
+
+  private attachPostListeners(): void {
+    // Back to gallery
+    const backBtn = document.getElementById('back-to-gallery');
+    backBtn?.addEventListener('click', () => {
+      this.currentPostId = null;
+      this.generatedVideoUrl = null;
+      this.currentView = 'gallery';
+      this.refreshView();
+    });
+
+    // Copy prompt
+    const copyBtn = document.getElementById('copy-post-prompt');
+    copyBtn?.addEventListener('click', async () => {
+      if (this.currentPostId) {
+        const post = storage.getFavorites().find(f => f.id === this.currentPostId);
+        if (post) {
+          await navigator.clipboard.writeText(post.prompt);
+          this.showToast('Prompt copied!', 'success');
+        }
+      }
+    });
+
+    // Delete post
+    const deleteBtn = document.getElementById('delete-post');
+    deleteBtn?.addEventListener('click', async () => {
+      if (this.currentPostId) {
+        const confirmed = await this.showConfirmModal({
+          title: 'Delete Image',
+          message: 'Are you sure you want to delete this image from your favorites?',
+          confirmText: 'Delete',
+          confirmClass: 'btn-danger'
+        });
+        if (confirmed) {
+          storage.removeFavorite(this.currentPostId);
+          this.currentPostId = null;
+          this.currentView = 'gallery';
+          this.refreshView();
+          this.showToast('Image deleted', 'success');
+        }
+      }
+    });
+
+    // Generate video
+    const generateVideoBtn = document.getElementById('generate-video');
+    generateVideoBtn?.addEventListener('click', async () => {
+      if (this.videoGenerating) return;
+
+      if (!grokApi.getApiKey()) {
+        this.showToast('Please set your API key in Settings first', 'error');
+        return;
+      }
+
+      const post = storage.getFavorites().find(f => f.id === this.currentPostId);
+      if (!post) return;
+
+      const videoPromptInput = document.getElementById('video-prompt') as HTMLTextAreaElement;
+      const videoPrompt = videoPromptInput?.value.trim() || post.prompt;
+
+      this.videoGenerating = true;
+      this.generatedVideoUrl = null;
+      this.refreshView();
+
+      try {
+        // Start video generation with the image as source
+        const response = await grokApi.generateVideo(videoPrompt, {
+          image: post.imageUrl ? { url: post.imageUrl } : undefined
+        });
+
+        // Poll for completion
+        const result = await grokApi.waitForVideo(response.request_id, (status) => {
+          console.log('Video generation status:', status);
+        });
+
+        if (result.video?.url) {
+          this.generatedVideoUrl = result.video.url;
+          this.showToast('Video generated successfully!', 'success');
+        } else {
+          throw new Error('No video URL in response');
+        }
+      } catch (error) {
+        console.error('Video generation error:', error);
+        this.showToast(error instanceof Error ? error.message : 'Failed to generate video', 'error');
+      } finally {
+        this.videoGenerating = false;
         this.refreshView();
       }
     });
