@@ -8,6 +8,7 @@ type ViewType = 'gallery' | 'chat' | 'image-gen' | 'settings';
 export class App {
   private currentView: ViewType = 'gallery';
   private chatMessages: GrokMessage[] = [];
+  private currentChatId: string | null = null;
   private isLoading = false;
 
   constructor() {
@@ -15,6 +16,19 @@ export class App {
     const savedApiKey = storage.getApiKey();
     if (savedApiKey) {
       grokApi.setApiKey(savedApiKey);
+    }
+    
+    // Restore current chat if exists
+    this.currentChatId = storage.getCurrentChatId();
+    if (this.currentChatId) {
+      const chat = storage.getChat(this.currentChatId);
+      if (chat?.messages) {
+        this.chatMessages = [...chat.messages];
+      } else {
+        // Chat was deleted, start fresh
+        this.currentChatId = null;
+        storage.setCurrentChatId(null);
+      }
     }
   }
 
@@ -203,37 +217,35 @@ export class App {
   }
 
   private renderChat(): string {
-    const selectedModel = storage.getSelectedModel();
-    const savedChats = storage.getFavorites().filter(f => f.type === 'chat');
+    const savedChats = storage.getSavedChats();
+    const currentChat = this.currentChatId ? storage.getChat(this.currentChatId) : null;
+    // Model comes from current chat if loaded, otherwise from global storage
+    const selectedModel = currentChat?.model || storage.getSelectedModel();
+
+    // Build chat selector options
+    const chatOptions = savedChats.map(chat => {
+      const title = chat.title || chat.prompt.slice(0, 40) || 'Untitled';
+      const isSelected = chat.id === this.currentChatId;
+      return `<option value="${chat.id}" ${isSelected ? 'selected' : ''}>${this.escapeHtml(title)}${title.length >= 40 ? '...' : ''}</option>`;
+    }).join('');
 
     return `
-      <div class="chat-layout">
-        <aside class="saved-chats-panel">
-          <div class="saved-chats-header">
-            <h3>${icons.messageSquare} Saved Chats</h3>
-            <button class="btn btn-primary btn-sm" id="new-chat">
-              ${icons.sparkles} New
-            </button>
+      <div class="chat-view">
+        <div class="chat-header">
+          <div class="chat-selector">
+            <select class="input input-select" id="chat-selector">
+              <option value="new" ${!this.currentChatId ? 'selected' : ''}>✨ New Chat</option>
+              ${savedChats.length > 0 ? `<optgroup label="Saved Chats">${chatOptions}</optgroup>` : ''}
+            </select>
+            ${this.currentChatId ? `
+              <button class="btn btn-danger btn-icon" id="delete-current-chat" title="Delete this chat">
+                ${icons.trash}
+              </button>
+            ` : ''}
           </div>
-          <div class="saved-chats-list">
-            ${savedChats.length === 0 
-              ? `<p class="text-muted">No saved chats yet</p>`
-              : savedChats.map(chat => `
-                  <div class="saved-chat-item" data-chat-id="${chat.id}">
-                    <div class="saved-chat-preview">${this.escapeHtml(chat.prompt.slice(0, 50))}${chat.prompt.length > 50 ? '...' : ''}</div>
-                    <div class="saved-chat-meta">
-                      <span>${chat.model}</span>
-                      <span>${new Date(chat.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <button class="btn btn-danger btn-icon btn-xs" data-action="delete-chat" data-chat-id="${chat.id}" title="Delete">
-                      ${icons.trash}
-                    </button>
-                  </div>
-                `).join('')
-            }
-          </div>
-        </aside>
-        <div class="chat-main">
+        </div>
+        
+        <div class="chat-container">
           <div class="chat-messages" id="chat-messages">
             ${this.chatMessages.length === 0 
               ? `<div class="empty-state">
@@ -250,30 +262,32 @@ export class App {
             ${this.isLoading ? `
               <div class="loading">
                 ${icons.loader}
-              <span>Grok is thinking...</span>
+                <span>Grok is thinking...</span>
+              </div>
+            ` : ''}
+          </div>
+          <div class="chat-input-area">
+            <div class="chat-input-container">
+              <textarea 
+                class="input" 
+                id="chat-input" 
+                placeholder="Type your message..."
+                rows="3"
+              ></textarea>
+              <button class="btn btn-primary" id="send-message" ${this.isLoading ? 'disabled' : ''}>
+                ${icons.send}
+              </button>
             </div>
-          ` : ''}
-          </div>
-          <div class="chat-input-container">
-            <textarea 
-              class="input" 
-              id="chat-input" 
-              placeholder="Type your message..."
-              rows="3"
-            ></textarea>
-            <button class="btn btn-primary" id="send-message" ${this.isLoading ? 'disabled' : ''}>
-              ${icons.send}
-            </button>
-          </div>
-          <div class="chat-controls">
-            <select class="input input-select" id="chat-model">
-              <option value="grok-4" ${selectedModel === 'grok-4' ? 'selected' : ''}>Grok 4</option>
-              <option value="grok-3" ${selectedModel === 'grok-3' ? 'selected' : ''}>Grok 3</option>
-              <option value="grok-3-mini" ${selectedModel === 'grok-3-mini' ? 'selected' : ''}>Grok 3 Mini</option>
-            </select>
-            <button class="btn btn-secondary" id="save-chat" ${this.chatMessages.length < 2 ? 'disabled' : ''}>
-              ${icons.heart} Save
-            </button>
+            <div class="chat-input-controls">
+              <select class="input input-select" id="chat-model">
+                <option value="grok-4" ${selectedModel === 'grok-4' ? 'selected' : ''}>Grok 4</option>
+                <option value="grok-3" ${selectedModel === 'grok-3' ? 'selected' : ''}>Grok 3</option>
+                <option value="grok-3-mini" ${selectedModel === 'grok-3-mini' ? 'selected' : ''}>Grok 3 Mini</option>
+              </select>
+              <button class="btn btn-secondary" id="save-chat" ${this.chatMessages.length < 2 ? 'disabled' : ''}>
+                ${icons.heart} Save
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -358,24 +372,9 @@ export class App {
         <section class="settings-section">
           <h3>${icons.zap} Usage & Costs</h3>
           ${this.renderUsageDetails()}
-          <button class="btn btn-secondary mt-4" id="reset-usage">
+          <button class="btn btn-danger mt-4" id="reset-usage">
             ${icons.trash} Reset Usage Stats
           </button>
-        </section>
-
-        <section class="settings-section">
-          <h3>${icons.grid} Data Management</h3>
-          <p class="text-secondary mb-4">
-            You have ${storage.getFavorites().length} saved favorites.
-          </p>
-          <div class="btn-group">
-            <button class="btn btn-secondary" id="export-data">
-              ${icons.copy} Export Data
-            </button>
-            <button class="btn btn-danger" id="clear-all-data">
-              ${icons.trash} Clear All Data
-            </button>
-          </div>
         </section>
 
         <section class="settings-section">
@@ -419,34 +418,8 @@ export class App {
             <div class="usage-card-label">Images Generated</div>
           </div>
         </div>
-        ${usage.history.length > 0 ? `
-          <h4 class="section-title mt-6">Recent Activity</h4>
-          <div class="usage-history">
-            ${usage.history.slice(0, 10).map(record => `
-              <div class="usage-history-item">
-                <span class="usage-history-type">${record.endpoint === 'chat' ? icons.messageSquare : icons.image}</span>
-                <span class="usage-history-model">${record.model}</span>
-                <span class="usage-history-details">${record.endpoint === 'chat' ? this.formatTokens(record.totalTokens) + ' tokens' : (record.imageCount || 1) + ' image(s)'}</span>
-                <span class="usage-history-cost">$${record.estimatedCost.toFixed(4)}</span>
-                <span class="usage-history-time">${this.formatTime(record.timestamp)}</span>
-              </div>
-            `).join('')}
-          </div>
-        ` : `
-          <p class="text-muted mt-4">No usage recorded yet. Start chatting or generating images!</p>
-        `}
       </div>
     `;
-  }
-
-  private formatTime(timestamp: number): string {
-    const now = Date.now();
-    const diff = now - timestamp;
-    
-    if (diff < 60000) return 'just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    return new Date(timestamp).toLocaleDateString();
   }
 
   private attachEventListeners(): void {
@@ -525,8 +498,9 @@ export class App {
     const sendBtn = document.getElementById('send-message');
     const input = document.getElementById('chat-input') as HTMLTextAreaElement;
     const modelSelect = document.getElementById('chat-model') as HTMLSelectElement;
+    const chatSelector = document.getElementById('chat-selector') as HTMLSelectElement;
+    const deleteBtn = document.getElementById('delete-current-chat');
     const saveBtn = document.getElementById('save-chat');
-    const newChatBtn = document.getElementById('new-chat');
 
     const sendMessage = async () => {
       const message = input?.value.trim();
@@ -556,6 +530,11 @@ export class App {
 
         const assistantMessage = response.choices[0]?.message.content || 'No response';
         this.chatMessages.push({ role: 'assistant', content: assistantMessage });
+
+        // Update existing saved chat if we're in one
+        if (this.currentChatId) {
+          storage.updateChat(this.currentChatId, this.chatMessages, model);
+        }
       } catch (error) {
         this.showToast(`Error: ${(error as Error).message}`, 'error');
         this.chatMessages.pop(); // Remove the failed user message
@@ -578,60 +557,66 @@ export class App {
       }
     });
 
-    // New chat button
-    newChatBtn?.addEventListener('click', () => {
-      this.chatMessages = [];
-      this.refreshView();
-    });
-
-    // Save chat
-    saveBtn?.addEventListener('click', () => {
-      if (this.chatMessages.length >= 2) {
-        const lastUserMsg = [...this.chatMessages].reverse().find(m => m.role === 'user');
-        const lastAssistantMsg = [...this.chatMessages].reverse().find(m => m.role === 'assistant');
-
-        if (lastUserMsg && lastAssistantMsg) {
-          storage.addFavorite({
-            type: 'chat',
-            prompt: lastUserMsg.content,
-            response: lastAssistantMsg.content,
-            messages: [...this.chatMessages],
-            model: storage.getSelectedModel(),
-            tags: [],
-          });
-          this.showToast('Chat saved!', 'success');
-          this.refreshView(); // Update saved chats list
-        }
+    // Model selector - update current chat's model
+    modelSelect?.addEventListener('change', () => {
+      const model = modelSelect.value;
+      storage.setSelectedModel(model);
+      // If we have a current chat, update its model too
+      if (this.currentChatId) {
+        storage.updateChat(this.currentChatId, this.chatMessages, model);
       }
     });
 
-    // Load saved chat
-    document.querySelectorAll('.saved-chat-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        if ((e.target as HTMLElement).closest('[data-action="delete-chat"]')) return;
-        const chatId = (item as HTMLElement).dataset.chatId;
-        if (chatId) {
-          const chat = storage.getFavorites().find(f => f.id === chatId);
-          if (chat?.messages) {
-            this.chatMessages = [...chat.messages];
-            storage.setSelectedModel(chat.model);
-            this.refreshView();
-          }
+    // Chat selector - switch between chats or start new
+    chatSelector?.addEventListener('change', () => {
+      const selectedValue = chatSelector.value;
+      
+      if (selectedValue === 'new') {
+        // Start a new chat
+        this.chatMessages = [];
+        this.currentChatId = null;
+        storage.setCurrentChatId(null);
+      } else {
+        // Load selected chat
+        const chat = storage.getChat(selectedValue);
+        if (chat?.messages) {
+          this.chatMessages = [...chat.messages];
+          this.currentChatId = chat.id;
+          storage.setCurrentChatId(chat.id);
         }
-      });
+      }
+      this.refreshView();
     });
 
-    // Delete saved chat
-    document.querySelectorAll('[data-action="delete-chat"]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const chatId = (e.currentTarget as HTMLElement).dataset.chatId;
-        if (chatId && confirm('Delete this saved chat?')) {
-          storage.removeFavorite(chatId);
-          this.refreshView();
-          this.showToast('Chat deleted', 'success');
+    // Delete current chat
+    deleteBtn?.addEventListener('click', () => {
+      if (this.currentChatId && confirm('Delete this chat?')) {
+        storage.removeFavorite(this.currentChatId);
+        this.chatMessages = [];
+        this.currentChatId = null;
+        storage.setCurrentChatId(null);
+        this.refreshView();
+        this.showToast('Chat deleted', 'success');
+      }
+    });
+
+    // Save chat as favorite
+    saveBtn?.addEventListener('click', () => {
+      if (this.chatMessages.length >= 2) {
+        const model = modelSelect?.value || storage.getSelectedModel();
+        if (this.currentChatId) {
+          // Already saved, just update
+          storage.updateChat(this.currentChatId, this.chatMessages, model);
+          this.showToast('Chat updated!', 'success');
+        } else {
+          // Save as new favorite
+          const newChat = storage.createChat(this.chatMessages, model);
+          this.currentChatId = newChat.id;
+          storage.setCurrentChatId(newChat.id);
+          this.showToast('Chat saved!', 'success');
         }
-      });
+        this.refreshView();
+      }
     });
   }
 
@@ -739,8 +724,6 @@ export class App {
   private attachSettingsListeners(): void {
     const saveApiKeyBtn = document.getElementById('save-api-key');
     const apiKeyInput = document.getElementById('api-key') as HTMLInputElement;
-    const exportBtn = document.getElementById('export-data');
-    const clearAllBtn = document.getElementById('clear-all-data');
 
     saveApiKeyBtn?.addEventListener('click', async () => {
       const apiKey = apiKeyInput?.value.trim();
@@ -768,29 +751,6 @@ export class App {
         }
       } else {
         this.showToast('Please enter an API key', 'error');
-      }
-    });
-
-    exportBtn?.addEventListener('click', () => {
-      const data = {
-        favorites: storage.getFavorites(),
-        exportedAt: new Date().toISOString(),
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `grok-bud-export-${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      this.showToast('Data exported!', 'success');
-    });
-
-    clearAllBtn?.addEventListener('click', () => {
-      if (confirm('This will delete all your favorites. Are you sure?')) {
-        localStorage.removeItem('grok-bud-state');
-        this.showToast('All data cleared', 'success');
-        this.refreshView();
       }
     });
 

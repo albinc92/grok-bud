@@ -92,6 +92,56 @@ export function setImageCount(count: number): void {
   saveState({ imageCount: Math.min(4, Math.max(1, count)) });
 }
 
+// Current chat tracking
+
+export function getCurrentChatId(): string | null {
+  const state = loadState();
+  return state.currentChatId || null;
+}
+
+export function setCurrentChatId(chatId: string | null): void {
+  saveState({ currentChatId: chatId });
+}
+
+export function getSavedChats(): FavoritePost[] {
+  return getFavorites().filter(f => f.type === 'chat');
+}
+
+export function getChat(id: string): FavoritePost | undefined {
+  return getFavorites().find(f => f.id === id && f.type === 'chat');
+}
+
+export function updateChat(id: string, messages: import('./types').GrokMessage[], model: string): void {
+  const chat = getChat(id);
+  if (chat) {
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+    const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant');
+    
+    updateFavorite(id, {
+      messages,
+      model,
+      prompt: lastUserMsg?.content || chat.prompt,
+      response: lastAssistantMsg?.content || chat.response,
+      updatedAt: Date.now(),
+    });
+  }
+}
+
+export function createChat(messages: import('./types').GrokMessage[], model: string, title?: string): FavoritePost {
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant');
+  
+  return addFavorite({
+    type: 'chat',
+    title: title || lastUserMsg?.content.slice(0, 50) || 'New Chat',
+    prompt: lastUserMsg?.content || '',
+    response: lastAssistantMsg?.content || '',
+    messages: [...messages],
+    model,
+    tags: [],
+  });
+}
+
 // Usage tracking functions
 
 export function getUsageStats(): UsageStats {

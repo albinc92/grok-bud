@@ -70,12 +70,14 @@ export interface ModelsResponse {
 export interface FavoritePost {
   id: string;
   type: 'chat' | 'image';
+  title?: string; // Display title for chats
   prompt: string;
   response: string;
   messages?: GrokMessage[]; // Full chat history for chat type
   imageUrl?: string;
   model: string;
   createdAt: number;
+  updatedAt?: number; // Track last update for chats
   tags: string[];
 }
 
@@ -115,4 +117,5 @@ export interface AppState {
   imageCount: number;
   isLoading: boolean;
   usage: UsageStats;
+  currentChatId: string | null; // null = new unsaved chat
 }
