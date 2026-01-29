@@ -647,26 +647,47 @@ export class App {
               <p>${this.escapeHtml(post.prompt)}</p>
             </div>
 
-            <div class="post-video-section">
+            <div class="post-video-section card">
               <h3>${icons.video} Generate Video</h3>
               <p class="text-secondary text-sm">Transform this image into a video using Grok's video generation.</p>
               
-              <div class="input-group">
-                <label for="video-prompt">Video Prompt (optional)</label>
-                <textarea 
-                  class="input" 
-                  id="video-prompt" 
-                  rows="2"
-                  placeholder="Describe how you want the image to animate..."
-                ></textarea>
-                <span class="input-hint">Leave empty to use the original image prompt</span>
-              </div>
-              
-              <div class="video-controls">
-                <button class="btn btn-primary" id="generate-video" ${this.videoGenerating ? 'disabled' : ''}>
-                  ${this.videoGenerating ? icons.loader : icons.video}
-                  ${this.videoGenerating ? 'Generating...' : 'Generate Video'}
-                </button>
+              <div class="video-gen-form">
+                <div class="input-group">
+                  <label for="video-prompt">Video Prompt (optional)</label>
+                  <textarea 
+                    class="input" 
+                    id="video-prompt" 
+                    rows="2"
+                    placeholder="Describe how you want the image to animate..."
+                  ></textarea>
+                  <span class="input-hint">Leave empty to use the original image prompt</span>
+                </div>
+                
+                <div class="video-gen-options">
+                  <div class="input-group">
+                    <label for="video-duration">Duration</label>
+                    <select class="input input-select" id="video-duration">
+                      <option value="5">5 seconds</option>
+                      <option value="6" selected>6 seconds</option>
+                      <option value="7">7 seconds</option>
+                      <option value="8">8 seconds</option>
+                      <option value="9">9 seconds</option>
+                      <option value="10">10 seconds</option>
+                      <option value="11">11 seconds</option>
+                      <option value="12">12 seconds</option>
+                      <option value="13">13 seconds</option>
+                      <option value="14">14 seconds</option>
+                      <option value="15">15 seconds</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div class="btn-group">
+                  <button class="btn btn-primary btn-lg w-full" id="generate-video" ${this.videoGenerating ? 'disabled' : ''}>
+                    ${this.videoGenerating ? icons.loader : icons.video}
+                    ${this.videoGenerating ? 'Generating...' : 'Generate Video'}
+                  </button>
+                </div>
               </div>
               
               ${this.videoGenerating ? `
@@ -684,7 +705,7 @@ export class App {
                     <source src="${this.generatedVideoUrl}" type="video/mp4">
                     Your browser does not support the video tag.
                   </video>
-                  <div class="video-actions">
+                  <div class="video-gen-actions">
                     <a href="${this.generatedVideoUrl}" download class="btn btn-success">
                       ${icons.download} Download Video
                     </a>
@@ -1208,7 +1229,9 @@ export class App {
       if (!post) return;
 
       const videoPromptInput = document.getElementById('video-prompt') as HTMLTextAreaElement;
+      const videoDurationSelect = document.getElementById('video-duration') as HTMLSelectElement;
       const videoPrompt = videoPromptInput?.value.trim() || post.prompt;
+      const videoDuration = parseInt(videoDurationSelect?.value || '6');
 
       this.videoGenerating = true;
       this.generatedVideoUrl = null;
@@ -1217,7 +1240,8 @@ export class App {
       try {
         // Start video generation with the image as source
         const response = await grokApi.generateVideo(videoPrompt, {
-          image: post.imageUrl ? { url: post.imageUrl } : undefined
+          image: post.imageUrl ? { url: post.imageUrl } : undefined,
+          duration: videoDuration
         });
 
         // Poll for completion

@@ -1164,12 +1164,32 @@ select.input {
   margin-bottom: var(--space-2);
 }
 
-.post-video-section > p {
+.post-video-section.card {
+  padding: var(--space-5);
+}
+
+.post-video-section.card > p {
   margin-bottom: var(--space-4);
 }
 
-.video-controls {
-  margin-top: var(--space-4);
+.video-gen-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.video-gen-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.video-gen-options .input-group {
+  margin-bottom: 0;
+}
+
+.video-gen-actions {
+  margin-top: var(--space-2);
 }
 
 .video-progress {
@@ -1186,8 +1206,8 @@ select.input {
   background: var(--color-bg-surface);
 }
 
-.video-actions {
-  display: flex;
+.generated-video .video-gen-actions {
+  margin-top: var(--space-4);
   justify-content: center;
   gap: var(--space-3);
   margin-top: var(--space-4);
