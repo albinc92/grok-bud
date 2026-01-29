@@ -1192,13 +1192,6 @@ select.input {
     display: block;
   }
   
-  .mobile-usage {
-    display: block;
-    position: sticky;
-    top: 0;
-    z-index: var(--z-sticky);
-  }
-  
   /* Main content adjustments */
   .main-content {
     margin-left: 0;
