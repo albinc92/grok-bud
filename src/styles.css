@@ -687,6 +687,57 @@ select.input {
   margin: 0 auto;
 }
 
+.image-gen-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.image-gen-options .input-group {
+  margin-bottom: 0;
+}
+
+.image-gen-options small {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.image-gen-info {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-surface);
+  font-size: var(--text-sm);
+}
+
+.image-gen-info p {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.image-gen-info svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.generated-images-grid {
+  margin-top: var(--space-8);
+}
+
+.generated-images-grid.multi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.generated-image-item {
+  text-align: center;
+}
+
 .generated-image-container {
   margin-top: var(--space-8);
   text-align: center;
@@ -704,6 +755,15 @@ select.input {
   gap: var(--space-3);
   margin-top: var(--space-5);
   flex-wrap: wrap;
+}
+
+.generated-image-item .image-actions {
+  margin-top: var(--space-3);
+}
+
+.btn-sm {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
 }
 
 /* ============================================
@@ -882,7 +942,7 @@ select.input {
   white-space: nowrap;
 }
 
-.usage-history-tokens {
+.usage-history-details {
   color: var(--color-text);
   font-weight: var(--font-medium);
   white-space: nowrap;

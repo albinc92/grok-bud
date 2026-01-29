@@ -6,7 +6,7 @@ import type {
   ModelsResponse,
   GrokMessage
 } from './types';
-import { recordUsage } from './storage';
+import { recordChatUsage, recordImageUsage } from './storage';
 
 const API_BASE_URL = 'https://api.x.ai/v1';
 
@@ -70,8 +70,7 @@ class GrokApiClient {
 
     // Track usage
     if (response.usage) {
-      recordUsage(
-        'chat',
+      recordChatUsage(
         model,
         response.usage.prompt_tokens,
         response.usage.completion_tokens,
@@ -100,9 +99,8 @@ class GrokApiClient {
       body: JSON.stringify(body),
     });
 
-    // Track usage for image generation (estimate tokens based on typical usage)
-    const estimatedTokens = 1000 * (options.n || 1); // Rough estimate per image
-    recordUsage('image', model, estimatedTokens, 0, estimatedTokens);
+    // Track usage - use actual returned image count
+    recordImageUsage(model, response.data.length);
 
     return response;
   }

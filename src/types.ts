@@ -86,13 +86,14 @@ export interface UsageRecord {
   completionTokens: number;
   totalTokens: number;
   estimatedCost: number; // in USD
+  imageCount?: number; // for image generation
 }
 
 export interface UsageStats {
   totalTokens: number;
   totalCost: number;
   chatTokens: number;
-  imageTokens: number;
+  imageCount: number;
   requestCount: number;
   history: UsageRecord[];
 }
@@ -110,6 +111,7 @@ export interface AppState {
   currentView: 'gallery' | 'chat' | 'image-gen' | 'settings';
   apiKey: string | null;
   selectedModel: string;
+  imageCount: number;
   isLoading: boolean;
   usage: UsageStats;
 }

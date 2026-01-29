@@ -275,6 +275,8 @@ export class App {
   }
 
   private renderImageGen(): string {
+    const imageCount = storage.getImageCount();
+    
     return `
       <div class="page-header">
         <h2>Image Generation</h2>
@@ -286,10 +288,22 @@ export class App {
           <textarea 
             class="input" 
             id="image-prompt" 
-            placeholder="Describe the image you want to generate..."
+            placeholder="Describe the image you want to generate...\n\nTip: Be specific about style, colors, composition, lighting, and mood for better results."
             rows="4"
           ></textarea>
         </div>
+        
+        <div class="input-group">
+          <label for="image-count">Number of Images</label>
+          <select class="input input-select" id="image-count">
+            <option value="1" ${imageCount === 1 ? 'selected' : ''}>1 image</option>
+            <option value="2" ${imageCount === 2 ? 'selected' : ''}>2 images</option>
+            <option value="3" ${imageCount === 3 ? 'selected' : ''}>3 images</option>
+            <option value="4" ${imageCount === 4 ? 'selected' : ''}>4 images</option>
+          </select>
+          <small class="text-muted">More images = higher cost</small>
+        </div>
+        
         <button class="btn btn-primary" id="generate-image" ${this.isLoading ? 'disabled' : ''}>
           ${this.isLoading ? icons.loader : icons.sparkles}
           ${this.isLoading ? 'Generating...' : 'Generate Image'}
@@ -395,8 +409,8 @@ export class App {
             <div class="usage-card-label">Chat Tokens</div>
           </div>
           <div class="usage-card">
-            <div class="usage-card-value">${this.formatTokens(usage.imageTokens)}</div>
-            <div class="usage-card-label">Image Tokens</div>
+            <div class="usage-card-value">${usage.imageCount || 0}</div>
+            <div class="usage-card-label">Images Generated</div>
           </div>
         </div>
         ${usage.history.length > 0 ? `
@@ -406,8 +420,8 @@ export class App {
               <div class="usage-history-item">
                 <span class="usage-history-type">${record.endpoint === 'chat' ? icons.messageSquare : icons.image}</span>
                 <span class="usage-history-model">${record.model}</span>
-                <span class="usage-history-tokens">${this.formatTokens(record.totalTokens)} tokens</span>
-                <span class="usage-history-cost">$${record.estimatedCost.toFixed(6)}</span>
+                <span class="usage-history-details">${record.endpoint === 'chat' ? this.formatTokens(record.totalTokens) + ' tokens' : (record.imageCount || 1) + ' image(s)'}</span>
+                <span class="usage-history-cost">$${record.estimatedCost.toFixed(4)}</span>
                 <span class="usage-history-time">${this.formatTime(record.timestamp)}</span>
               </div>
             `).join('')}
@@ -585,9 +599,16 @@ export class App {
   private attachImageGenListeners(): void {
     const generateBtn = document.getElementById('generate-image');
     const promptInput = document.getElementById('image-prompt') as HTMLTextAreaElement;
+    const countSelect = document.getElementById('image-count') as HTMLSelectElement;
+
+    // Save count preference
+    countSelect?.addEventListener('change', () => {
+      storage.setImageCount(parseInt(countSelect.value));
+    });
 
     generateBtn?.addEventListener('click', async () => {
       const prompt = promptInput?.value.trim();
+      const imageCount = parseInt(countSelect?.value || '1');
       if (!prompt || this.isLoading) return;
 
       if (!grokApi.getApiKey()) {
@@ -599,36 +620,67 @@ export class App {
       this.refreshView();
 
       try {
-        const response = await grokApi.generateImage(prompt);
-        const imageUrl = response.data[0]?.url;
+        const response = await grokApi.generateImage(prompt, 'grok-imagine-image', { n: imageCount });
+        const images = response.data;
 
-        if (imageUrl) {
+        if (images.length > 0) {
           const resultDiv = document.getElementById('generated-image-result');
           if (resultDiv) {
-            resultDiv.innerHTML = `
-              <div class="generated-image-container">
-                <img src="${imageUrl}" alt="Generated image" class="generated-image">
+            const imagesHtml = images.map((img, idx) => `
+              <div class="generated-image-item">
+                <img src="${img.url}" alt="Generated image ${idx + 1}" class="generated-image">
                 <div class="image-actions">
-                  <button class="btn btn-primary" id="save-generated-image">
-                    ${icons.heart} Save to Favorites
+                  <button class="btn btn-secondary btn-sm save-single-image" data-url="${img.url}" data-prompt="${img.revised_prompt || prompt}">
+                    ${icons.heart} Save
                   </button>
-                  <a href="${imageUrl}" target="_blank" class="btn btn-secondary">
-                    Open Full Size
+                  <a href="${img.url}" target="_blank" class="btn btn-ghost btn-sm">
+                    ${icons.externalLink} Open
                   </a>
                 </div>
               </div>
+            `).join('');
+            
+            resultDiv.innerHTML = `
+              <div class="generated-images-grid ${images.length > 1 ? 'multi' : ''}">
+                ${imagesHtml}
+              </div>
+              ${images.length > 1 ? `
+                <button class="btn btn-primary mt-4" id="save-all-images">
+                  ${icons.heart} Save All to Favorites
+                </button>
+              ` : ''}
             `;
 
-            document.getElementById('save-generated-image')?.addEventListener('click', () => {
-              storage.addFavorite({
-                type: 'image',
-                prompt: prompt,
-                response: response.data[0]?.revised_prompt || 'Generated image',
-                imageUrl: imageUrl,
-                model: 'grok-imagine-image',
-                tags: [],
+            // Single image save handlers
+            resultDiv.querySelectorAll('.save-single-image').forEach(btn => {
+              btn.addEventListener('click', () => {
+                const url = (btn as HTMLElement).dataset.url!;
+                const revisedPrompt = (btn as HTMLElement).dataset.prompt!;
+                storage.addFavorite({
+                  type: 'image',
+                  prompt: prompt,
+                  response: revisedPrompt,
+                  imageUrl: url,
+                  model: 'grok-imagine-image',
+                  tags: [],
+                });
+                this.showToast('Saved to favorites!', 'success');
               });
-              this.showToast('Saved to favorites!', 'success');
+            });
+
+            // Save all handler
+            document.getElementById('save-all-images')?.addEventListener('click', () => {
+              images.forEach((img, idx) => {
+                storage.addFavorite({
+                  type: 'image',
+                  prompt: prompt,
+                  response: img.revised_prompt || `Generated image ${idx + 1}`,
+                  imageUrl: img.url!,
+                  model: 'grok-imagine-image',
+                  tags: [],
+                });
+              });
+              this.showToast(`Saved ${images.length} images to favorites!`, 'success');
             });
           }
         }
