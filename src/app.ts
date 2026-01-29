@@ -10,6 +10,11 @@ export class App {
   private chatMessages: GrokMessage[] = [];
   private currentChatId: string | null = null;
   private isLoading = false;
+  
+  // Image generation state cache
+  private imageGenPrompt: string = '';
+  private imageGenResults: Array<{ url: string; revised_prompt?: string }> = [];
+  private imageGenSavedUrls: Set<string> = new Set();
 
   constructor() {
     // Initialize API key from storage
@@ -310,7 +315,7 @@ export class App {
             id="image-prompt" 
             placeholder="Describe the image you want to generate...\n\nTip: Be specific about style, colors, composition, lighting, and mood for better results."
             rows="4"
-          ></textarea>
+          >${this.escapeHtml(this.imageGenPrompt)}</textarea>
         </div>
         
         <div class="input-group">
@@ -329,7 +334,46 @@ export class App {
           ${this.isLoading ? 'Generating...' : 'Generate Image'}
         </button>
     </section>
-      <div id="generated-image-result"></div>
+      <div id="generated-image-result">${this.renderCachedImageResults()}</div>
+    `;
+  }
+
+  private renderCachedImageResults(): string {
+    if (this.imageGenResults.length === 0) return '';
+    
+    const images = this.imageGenResults;
+    const prompt = this.imageGenPrompt;
+    const allSaved = images.every(img => this.imageGenSavedUrls.has(img.url));
+    
+    const imagesHtml = images.map((img, idx) => {
+      const isSaved = this.imageGenSavedUrls.has(img.url);
+      return `
+        <div class="generated-image-item">
+          <img src="${img.url}" alt="Generated image ${idx + 1}" class="generated-image">
+          <div class="image-actions">
+            <button class="btn btn-success btn-sm save-single-image" data-url="${img.url}" data-prompt="${img.revised_prompt || prompt}" ${isSaved ? 'disabled' : ''}>
+              ${isSaved ? icons.heartFilled : icons.heart} ${isSaved ? 'Saved' : 'Save'}
+            </button>
+            <a href="${img.url}" target="_blank" class="btn btn-ghost btn-sm">
+              ${icons.externalLink} Open
+            </a>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    return `
+      <div class="generated-images-grid ${images.length > 1 ? 'multi' : ''}">
+        ${imagesHtml}
+      </div>
+      <div class="row mt-4">
+        <button class="btn btn-ghost flex-1" id="regenerate-images">
+          ${icons.refresh} Regenerate
+        </button>
+        <button class="btn btn-primary flex-1" id="save-all-images" ${allSaved ? 'disabled' : ''}>
+          ${allSaved ? icons.heartFilled : icons.heart} ${allSaved ? 'Saved' : 'Save'} ${images.length > 1 ? 'All' : ''}
+        </button>
+      </div>
     `;
   }
 
@@ -624,6 +668,11 @@ export class App {
       storage.setImageCount(parseInt(countSelect.value));
     });
 
+    // Save prompt on input
+    promptInput?.addEventListener('input', () => {
+      this.imageGenPrompt = promptInput.value;
+    });
+
     generateBtn?.addEventListener('click', async () => {
       const prompt = promptInput?.value.trim();
       const imageCount = parseInt(countSelect?.value || '1');
@@ -635,6 +684,9 @@ export class App {
       }
 
       this.isLoading = true;
+      // Clear previous results when regenerating
+      this.imageGenResults = [];
+      this.imageGenSavedUrls.clear();
       this.refreshView();
 
       try {
@@ -642,73 +694,88 @@ export class App {
         const images = response.data;
 
         if (images.length > 0) {
-          const resultDiv = document.getElementById('generated-image-result');
-          if (resultDiv) {
-            const imagesHtml = images.map((img, idx) => `
-              <div class="generated-image-item">
-                <img src="${img.url}" alt="Generated image ${idx + 1}" class="generated-image">
-                <div class="image-actions">
-                  <button class="btn btn-success btn-sm save-single-image" data-url="${img.url}" data-prompt="${img.revised_prompt || prompt}">
-                    ${icons.heart} Save
-                  </button>
-                  <a href="${img.url}" target="_blank" class="btn btn-ghost btn-sm">
-                    ${icons.externalLink} Open
-                  </a>
-                </div>
-              </div>
-            `).join('');
-            
-            resultDiv.innerHTML = `
-              <div class="generated-images-grid ${images.length > 1 ? 'multi' : ''}">
-                ${imagesHtml}
-              </div>
-              ${images.length > 1 ? `
-                <button class="btn btn-primary full-width mt-4" id="save-all-images">
-                  ${icons.heart} Save All to Favorites
-                </button>
-              ` : ''}
-            `;
-
-            // Single image save handlers
-            resultDiv.querySelectorAll('.save-single-image').forEach(btn => {
-              btn.addEventListener('click', () => {
-                const url = (btn as HTMLElement).dataset.url!;
-                const revisedPrompt = (btn as HTMLElement).dataset.prompt!;
-                storage.addFavorite({
-                  type: 'image',
-                  prompt: prompt,
-                  response: revisedPrompt,
-                  imageUrl: url,
-                  model: 'grok-imagine-image',
-                  tags: [],
-                });
-                this.showToast('Saved to favorites!', 'success');
-              });
-            });
-
-            // Save all handler
-            document.getElementById('save-all-images')?.addEventListener('click', () => {
-              images.forEach((img, idx) => {
-                storage.addFavorite({
-                  type: 'image',
-                  prompt: prompt,
-                  response: img.revised_prompt || `Generated image ${idx + 1}`,
-                  imageUrl: img.url!,
-                  model: 'grok-imagine-image',
-                  tags: [],
-                });
-              });
-              this.showToast(`Saved ${images.length} images to favorites!`, 'success');
-            });
-          }
+          // Cache the results
+          this.imageGenPrompt = prompt;
+          this.imageGenResults = images.map(img => ({
+            url: img.url!,
+            revised_prompt: img.revised_prompt
+          }));
+          
+          // Re-render to show cached results
+          this.isLoading = false;
+          this.refreshView();
+          this.refreshSidebar();
         }
       } catch (error) {
         this.showToast(`Error: ${(error as Error).message}`, 'error');
-      } finally {
         this.isLoading = false;
-        // Refresh sidebar to update usage stats
-        this.refreshSidebar();
+        this.refreshView();
       }
+    });
+
+    // Attach handlers for cached results
+    this.attachImageResultHandlers();
+  }
+
+  private attachImageResultHandlers(): void {
+    const resultDiv = document.getElementById('generated-image-result');
+    if (!resultDiv || this.imageGenResults.length === 0) return;
+
+    const generateBtn = document.getElementById('generate-image');
+    const prompt = this.imageGenPrompt;
+    const images = this.imageGenResults;
+
+    // Regenerate handler
+    document.getElementById('regenerate-images')?.addEventListener('click', () => {
+      generateBtn?.click();
+    });
+
+    // Single image save handlers
+    resultDiv.querySelectorAll('.save-single-image').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const url = (btn as HTMLElement).dataset.url!;
+        const revisedPrompt = (btn as HTMLElement).dataset.prompt!;
+        storage.addFavorite({
+          type: 'image',
+          prompt: prompt,
+          response: revisedPrompt,
+          imageUrl: url,
+          model: 'grok-imagine-image',
+          tags: [],
+        });
+        // Track saved state
+        this.imageGenSavedUrls.add(url);
+        // Update button to show saved state
+        btn.innerHTML = `${icons.heartFilled} Saved`;
+        (btn as HTMLButtonElement).disabled = true;
+        this.showToast('Saved to favorites!', 'success');
+      });
+    });
+
+    // Save all handler
+    const saveAllBtn = document.getElementById('save-all-images');
+    saveAllBtn?.addEventListener('click', () => {
+      images.forEach((img, idx) => {
+        storage.addFavorite({
+          type: 'image',
+          prompt: prompt,
+          response: img.revised_prompt || `Generated image ${idx + 1}`,
+          imageUrl: img.url,
+          model: 'grok-imagine-image',
+          tags: [],
+        });
+        // Track saved state
+        this.imageGenSavedUrls.add(img.url);
+      });
+      // Update button to show saved state
+      saveAllBtn.innerHTML = `${icons.heartFilled} Saved ${images.length > 1 ? 'All' : ''}`;
+      (saveAllBtn as HTMLButtonElement).disabled = true;
+      // Also disable individual save buttons
+      resultDiv.querySelectorAll('.save-single-image').forEach(btn => {
+        btn.innerHTML = `${icons.heartFilled} Saved`;
+        (btn as HTMLButtonElement).disabled = true;
+      });
+      this.showToast(`Saved ${images.length} images to favorites!`, 'success');
     });
   }
 
