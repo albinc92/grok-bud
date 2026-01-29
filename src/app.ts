@@ -257,8 +257,8 @@ export class App {
             ${icons.send}
           </button>
         </div>
-        <div style="margin-top: 16px; display: flex; gap: 12px; align-items: center;">
-          <select class="input" id="chat-model" style="max-width: 200px;">
+        <div class="chat-controls">
+          <select class="input input-select" id="chat-model">
             <option value="grok-4" ${selectedModel === 'grok-4' ? 'selected' : ''}>Grok 4</option>
             <option value="grok-3" ${selectedModel === 'grok-3' ? 'selected' : ''}>Grok 3</option>
             <option value="grok-3-mini" ${selectedModel === 'grok-3-mini' ? 'selected' : ''}>Grok 3 Mini</option>
@@ -338,31 +338,33 @@ export class App {
         <section class="settings-section">
           <h3>${icons.zap} Usage & Costs</h3>
           ${this.renderUsageDetails()}
-          <button class="btn btn-secondary" id="reset-usage" style="margin-top: 16px;">
+          <button class="btn btn-secondary mt-4" id="reset-usage">
             ${icons.trash} Reset Usage Stats
           </button>
         </section>
 
         <section class="settings-section">
           <h3>${icons.grid} Data Management</h3>
-          <p style="color: var(--color-text-secondary); margin-bottom: 16px;">
+          <p class="text-secondary mb-4">
             You have ${storage.getFavorites().length} saved favorites.
           </p>
-          <button class="btn btn-secondary" id="export-data">
-            ${icons.copy} Export Data
-          </button>
-          <button class="btn btn-danger" id="clear-all-data" style="margin-left: 12px;">
-            ${icons.trash} Clear All Data
-          </button>
+          <div class="btn-group">
+            <button class="btn btn-secondary" id="export-data">
+              ${icons.copy} Export Data
+            </button>
+            <button class="btn btn-danger" id="clear-all-data">
+              ${icons.trash} Clear All Data
+            </button>
+          </div>
         </section>
 
         <section class="settings-section">
           <h3>${icons.sparkles} About</h3>
-          <p style="color: var(--color-text-secondary);">
+          <p class="text-secondary">
             Grok Bud is a personal AI assistant interface powered by xAI's Grok API.
             Save your favorite conversations and generated images in a beautiful gallery.
           </p>
-          <p style="color: var(--color-text-muted); margin-top: 12px; font-size: 0.875rem;">
+          <p class="text-muted mt-3 text-sm">
             Version 1.0.0 • Built with Vite + TypeScript
           </p>
         </section>
@@ -398,7 +400,7 @@ export class App {
           </div>
         </div>
         ${usage.history.length > 0 ? `
-          <h4 style="margin-top: 24px; margin-bottom: 12px; color: var(--color-text-secondary);">Recent Activity</h4>
+          <h4 class="section-title mt-6">Recent Activity</h4>
           <div class="usage-history">
             ${usage.history.slice(0, 10).map(record => `
               <div class="usage-history-item">
@@ -411,7 +413,7 @@ export class App {
             `).join('')}
           </div>
         ` : `
-          <p style="color: var(--color-text-muted); margin-top: 16px;">No usage recorded yet. Start chatting or generating images!</p>
+          <p class="text-muted mt-4">No usage recorded yet. Start chatting or generating images!</p>
         `}
       </div>
     `;
