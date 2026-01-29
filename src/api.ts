@@ -13,7 +13,7 @@ const API_BASE_URL = 'https://api.x.ai/v1';
 class GrokApiClient {
   private apiKey: string | null = null;
 
-  setApiKey(key: string): void {
+  setApiKey(key: string | null): void {
     this.apiKey = key;
   }
 

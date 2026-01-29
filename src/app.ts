@@ -29,6 +29,25 @@ export class App {
     const usage = storage.getUsageStats();
     
     return `
+      <!-- Mobile Usage Bar -->
+      <div class="mobile-usage">
+        <div class="mobile-usage-stats">
+          <div class="mobile-usage-stat">
+            <span class="mobile-usage-value">${this.formatTokens(usage.totalTokens)}</span>
+            <span class="mobile-usage-label">tokens</span>
+          </div>
+          <div class="mobile-usage-stat">
+            <span class="mobile-usage-value">$${usage.totalCost.toFixed(4)}</span>
+            <span class="mobile-usage-label">cost</span>
+          </div>
+          <div class="mobile-usage-stat">
+            <span class="mobile-usage-value">${usage.requestCount}</span>
+            <span class="mobile-usage-label">requests</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-logo">
           <img src="/grok.svg" alt="Grok Bud">
@@ -73,9 +92,35 @@ export class App {
           </div>
         </div>
       </aside>
+
+      <!-- Main Content -->
       <main class="main-content">
         ${this.renderCurrentView()}
       </main>
+
+      <!-- Mobile Bottom Navigation -->
+      <nav class="mobile-nav">
+        <div class="mobile-nav-items">
+          <button class="mobile-nav-item ${this.currentView === 'gallery' ? 'active' : ''}" data-view="gallery">
+            ${icons.grid}
+            <span>Gallery</span>
+          </button>
+          <button class="mobile-nav-item ${this.currentView === 'chat' ? 'active' : ''}" data-view="chat">
+            ${icons.messageSquare}
+            <span>Chat</span>
+          </button>
+          <button class="mobile-nav-item ${this.currentView === 'image-gen' ? 'active' : ''}" data-view="image-gen">
+            ${icons.image}
+            <span>Image</span>
+          </button>
+          <button class="mobile-nav-item ${this.currentView === 'settings' ? 'active' : ''}" data-view="settings">
+            ${icons.settings}
+            <span>Settings</span>
+          </button>
+        </div>
+      </nav>
+
+      <!-- Toast Notifications -->
       <div class="toast-container" id="toast-container"></div>
     `;
   }
@@ -383,8 +428,19 @@ export class App {
   }
 
   private attachEventListeners(): void {
-    // Navigation
+    // Desktop Navigation
     document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const view = (e.currentTarget as HTMLElement).dataset.view as ViewType;
+        if (view) {
+          this.currentView = view;
+          this.refreshView();
+        }
+      });
+    });
+
+    // Mobile Navigation
+    document.querySelectorAll('.mobile-nav-item').forEach(item => {
       item.addEventListener('click', (e) => {
         const view = (e.currentTarget as HTMLElement).dataset.view as ViewType;
         if (view) {
@@ -661,13 +717,44 @@ export class App {
       mainContent.innerHTML = this.renderCurrentView();
     }
 
-    // Update nav active state
+    // Update desktop nav active state
     document.querySelectorAll('.nav-item').forEach(item => {
       const view = (item as HTMLElement).dataset.view;
       item.classList.toggle('active', view === this.currentView);
     });
 
+    // Update mobile nav active state
+    document.querySelectorAll('.mobile-nav-item').forEach(item => {
+      const view = (item as HTMLElement).dataset.view;
+      item.classList.toggle('active', view === this.currentView);
+    });
+
+    // Update usage stats display
+    this.updateUsageDisplay();
+
     this.attachViewListeners();
+  }
+
+  private updateUsageDisplay(): void {
+    const usage = storage.getUsageStats();
+    
+    // Update sidebar usage widget
+    const sidebarTokens = document.querySelector('.usage-widget .usage-stat:nth-child(1) .usage-value');
+    const sidebarCost = document.querySelector('.usage-widget .usage-stat:nth-child(2) .usage-value');
+    const sidebarRequests = document.querySelector('.usage-widget .usage-stat:nth-child(3) .usage-value');
+    
+    if (sidebarTokens) sidebarTokens.textContent = this.formatTokens(usage.totalTokens);
+    if (sidebarCost) sidebarCost.textContent = `$${usage.totalCost.toFixed(4)}`;
+    if (sidebarRequests) sidebarRequests.textContent = usage.requestCount.toString();
+    
+    // Update mobile usage bar
+    const mobileTokens = document.querySelector('.mobile-usage-stat:nth-child(1) .mobile-usage-value');
+    const mobileCost = document.querySelector('.mobile-usage-stat:nth-child(2) .mobile-usage-value');
+    const mobileRequests = document.querySelector('.mobile-usage-stat:nth-child(3) .mobile-usage-value');
+    
+    if (mobileTokens) mobileTokens.textContent = this.formatTokens(usage.totalTokens);
+    if (mobileCost) mobileCost.textContent = `$${usage.totalCost.toFixed(4)}`;
+    if (mobileRequests) mobileRequests.textContent = usage.requestCount.toString();
   }
 
   private showToast(message: string, type: 'success' | 'error' = 'success'): void {
