@@ -150,64 +150,49 @@ export class App {
   }
 
   private renderGallery(): string {
-    const favorites = storage.getFavorites();
+    const allFavorites = storage.getFavorites();
+    const images = allFavorites.filter(f => f.type === 'image');
 
-    if (favorites.length === 0) {
+    if (images.length === 0) {
       return `
         <div class="page-header">
-          <h2>Favorites Gallery</h2>
-          <p>Your saved conversations and generated images</p>
+          <h2>Image Gallery</h2>
+          <p>Your generated images</p>
         </div>
         <div class="empty-state">
-          ${icons.heartFilled}
-          <h3>No favorites yet</h3>
-          <p>Start chatting or generating images and save your favorites here!</p>
+          ${icons.image}
+          <h3>No images yet</h3>
+          <p>Generate some images and save them to see them here!</p>
         </div>
       `;
     }
 
     return `
       <div class="page-header">
-        <h2>Favorites Gallery</h2>
-        <p>Your saved conversations and generated images (${favorites.length} items)</p>
+        <h2>Image Gallery</h2>
+        <p>Your generated images (${images.length} items)</p>
       </div>
       <div class="gallery-grid">
-        ${favorites.map(post => this.renderGalleryCard(post)).join('')}
+        ${images.map(post => this.renderGalleryCard(post)).join('')}
       </div>
     `;
   }
 
   private renderGalleryCard(post: FavoritePost): string {
     const date = new Date(post.createdAt).toLocaleDateString();
-    const typeIcon = post.type === 'image' ? icons.image : icons.messageSquare;
 
     return `
       <article class="gallery-card" data-post-id="${post.id}">
-        ${post.imageUrl 
-          ? `<img src="${post.imageUrl}" alt="Generated image" class="card-image">`
-          : `<div class="card-image-placeholder">${icons.sparkles}</div>`
-        }
+        <img src="${post.imageUrl}" alt="Generated image" class="card-image">
         <div class="card-content">
-          <div class="card-type">
-            ${typeIcon}
-            ${post.type === 'image' ? 'Image' : 'Chat'}
-          </div>
           <p class="card-prompt">${this.escapeHtml(post.prompt)}</p>
-          <p class="card-response">${this.escapeHtml(post.response)}</p>
-          ${post.tags.length > 0 ? `
-            <div class="card-tags">
-              ${post.tags.map(tag => `
-                <span class="tag">${icons.tag} ${this.escapeHtml(tag)}</span>
-              `).join('')}
-            </div>
-          ` : ''}
           <div class="card-footer">
             <span class="card-meta">${post.model} • ${date}</span>
             <div class="card-actions">
-              <button class="btn btn-ghost btn-icon" data-action="copy" data-post-id="${post.id}" title="Copy response">
+              <button class="btn btn-ghost btn-icon" data-action="copy" data-post-id="${post.id}" title="Copy prompt">
                 ${icons.copy}
               </button>
-              <button class="btn btn-danger btn-icon" data-action="delete" data-post-id="${post.id}" title="Remove from favorites">
+              <button class="btn btn-danger btn-icon" data-action="delete" data-post-id="${post.id}" title="Delete">
                 ${icons.trash}
               </button>
             </div>
@@ -219,56 +204,77 @@ export class App {
 
   private renderChat(): string {
     const selectedModel = storage.getSelectedModel();
+    const savedChats = storage.getFavorites().filter(f => f.type === 'chat');
 
     return `
-      <div class="page-header">
-        <h2>Chat with Grok</h2>
-        <p>Have a conversation with Grok AI</p>
-      </div>
-      <div class="chat-container">
-        <div class="chat-messages" id="chat-messages">
-          ${this.chatMessages.length === 0 
-            ? `<div class="empty-state">
-                 ${icons.sparkles}
-                 <h3>Start a conversation</h3>
-                 <p>Type a message below to begin chatting with Grok</p>
-               </div>`
-            : this.chatMessages.map(msg => `
-                <div class="message message-${msg.role}">
-                  <div class="message-content">${this.escapeHtml(msg.content)}</div>
-                </div>
-              `).join('')
-          }
-          ${this.isLoading ? `
-            <div class="loading">
-              ${icons.loader}
+      <div class="chat-layout">
+        <aside class="saved-chats-panel">
+          <div class="saved-chats-header">
+            <h3>${icons.messageSquare} Saved Chats</h3>
+            <button class="btn btn-primary btn-sm" id="new-chat">
+              ${icons.sparkles} New
+            </button>
+          </div>
+          <div class="saved-chats-list">
+            ${savedChats.length === 0 
+              ? `<p class="text-muted">No saved chats yet</p>`
+              : savedChats.map(chat => `
+                  <div class="saved-chat-item" data-chat-id="${chat.id}">
+                    <div class="saved-chat-preview">${this.escapeHtml(chat.prompt.slice(0, 50))}${chat.prompt.length > 50 ? '...' : ''}</div>
+                    <div class="saved-chat-meta">
+                      <span>${chat.model}</span>
+                      <span>${new Date(chat.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <button class="btn btn-danger btn-icon btn-xs" data-action="delete-chat" data-chat-id="${chat.id}" title="Delete">
+                      ${icons.trash}
+                    </button>
+                  </div>
+                `).join('')
+            }
+          </div>
+        </aside>
+        <div class="chat-main">
+          <div class="chat-messages" id="chat-messages">
+            ${this.chatMessages.length === 0 
+              ? `<div class="empty-state">
+                   ${icons.sparkles}
+                   <h3>Start a conversation</h3>
+                   <p>Type a message below to begin chatting with Grok</p>
+                 </div>`
+              : this.chatMessages.map(msg => `
+                  <div class="message message-${msg.role}">
+                    <div class="message-content">${this.escapeHtml(msg.content)}</div>
+                  </div>
+                `).join('')
+            }
+            ${this.isLoading ? `
+              <div class="loading">
+                ${icons.loader}
               <span>Grok is thinking...</span>
             </div>
           ` : ''}
-        </div>
-        <div class="chat-input-container">
-          <textarea 
-            class="input" 
-            id="chat-input" 
-            placeholder="Type your message..."
-            rows="3"
-          ></textarea>
-          <button class="btn btn-primary" id="send-message" ${this.isLoading ? 'disabled' : ''}>
-            ${icons.send}
-          </button>
-        </div>
-        <div class="chat-controls">
-          <select class="input input-select" id="chat-model">
-            <option value="grok-4" ${selectedModel === 'grok-4' ? 'selected' : ''}>Grok 4</option>
-            <option value="grok-3" ${selectedModel === 'grok-3' ? 'selected' : ''}>Grok 3</option>
-            <option value="grok-3-mini" ${selectedModel === 'grok-3-mini' ? 'selected' : ''}>Grok 3 Mini</option>
-          </select>
-          <button class="btn btn-secondary" id="save-chat" ${this.chatMessages.length < 2 ? 'disabled' : ''}>
-            ${icons.heart} Save to Favorites
-          </button>
-          <button class="btn btn-ghost" id="clear-chat" ${this.chatMessages.length === 0 ? 'disabled' : ''}>
-            ${icons.trash} Clear
-          </button>
+          </div>
+          <div class="chat-input-container">
+            <textarea 
+              class="input" 
+              id="chat-input" 
+              placeholder="Type your message..."
+              rows="3"
+            ></textarea>
+            <button class="btn btn-primary" id="send-message" ${this.isLoading ? 'disabled' : ''}>
+              ${icons.send}
+            </button>
+          </div>
+          <div class="chat-controls">
+            <select class="input input-select" id="chat-model">
+              <option value="grok-4" ${selectedModel === 'grok-4' ? 'selected' : ''}>Grok 4</option>
+              <option value="grok-3" ${selectedModel === 'grok-3' ? 'selected' : ''}>Grok 3</option>
+              <option value="grok-3-mini" ${selectedModel === 'grok-3-mini' ? 'selected' : ''}>Grok 3 Mini</option>
+            </select>
+            <button class="btn btn-secondary" id="save-chat" ${this.chatMessages.length < 2 ? 'disabled' : ''}>
+              ${icons.heart} Save
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -492,10 +498,10 @@ export class App {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const postId = (e.currentTarget as HTMLElement).dataset.postId;
-        if (postId && confirm('Remove this from favorites?')) {
+        if (postId && confirm('Delete this image?')) {
           storage.removeFavorite(postId);
           this.refreshView();
-          this.showToast('Removed from favorites', 'success');
+          this.showToast('Image deleted', 'success');
         }
       });
     });
@@ -507,8 +513,8 @@ export class App {
         if (postId) {
           const post = storage.getFavorites().find(f => f.id === postId);
           if (post) {
-            await navigator.clipboard.writeText(post.response);
-            this.showToast('Copied to clipboard!', 'success');
+            await navigator.clipboard.writeText(post.prompt);
+            this.showToast('Prompt copied!', 'success');
           }
         }
       });
@@ -520,7 +526,7 @@ export class App {
     const input = document.getElementById('chat-input') as HTMLTextAreaElement;
     const modelSelect = document.getElementById('chat-model') as HTMLSelectElement;
     const saveBtn = document.getElementById('save-chat');
-    const clearBtn = document.getElementById('clear-chat');
+    const newChatBtn = document.getElementById('new-chat');
 
     const sendMessage = async () => {
       const message = input?.value.trim();
@@ -572,6 +578,13 @@ export class App {
       }
     });
 
+    // New chat button
+    newChatBtn?.addEventListener('click', () => {
+      this.chatMessages = [];
+      this.refreshView();
+    });
+
+    // Save chat
     saveBtn?.addEventListener('click', () => {
       if (this.chatMessages.length >= 2) {
         const lastUserMsg = [...this.chatMessages].reverse().find(m => m.role === 'user');
@@ -582,17 +595,43 @@ export class App {
             type: 'chat',
             prompt: lastUserMsg.content,
             response: lastAssistantMsg.content,
+            messages: [...this.chatMessages],
             model: storage.getSelectedModel(),
             tags: [],
           });
-          this.showToast('Saved to favorites!', 'success');
+          this.showToast('Chat saved!', 'success');
+          this.refreshView(); // Update saved chats list
         }
       }
     });
 
-    clearBtn?.addEventListener('click', () => {
-      this.chatMessages = [];
-      this.refreshView();
+    // Load saved chat
+    document.querySelectorAll('.saved-chat-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('[data-action="delete-chat"]')) return;
+        const chatId = (item as HTMLElement).dataset.chatId;
+        if (chatId) {
+          const chat = storage.getFavorites().find(f => f.id === chatId);
+          if (chat?.messages) {
+            this.chatMessages = [...chat.messages];
+            storage.setSelectedModel(chat.model);
+            this.refreshView();
+          }
+        }
+      });
+    });
+
+    // Delete saved chat
+    document.querySelectorAll('[data-action="delete-chat"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const chatId = (e.currentTarget as HTMLElement).dataset.chatId;
+        if (chatId && confirm('Delete this saved chat?')) {
+          storage.removeFavorite(chatId);
+          this.refreshView();
+          this.showToast('Chat deleted', 'success');
+        }
+      });
     });
   }
 

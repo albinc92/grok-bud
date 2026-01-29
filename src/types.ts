@@ -72,6 +72,7 @@ export interface FavoritePost {
   type: 'chat' | 'image';
   prompt: string;
   response: string;
+  messages?: GrokMessage[]; // Full chat history for chat type
   imageUrl?: string;
   model: string;
   createdAt: number;
