@@ -32,6 +32,9 @@ export class App {
   private authModalMode: AuthModalMode = null;
   private authLoading = false;
   private isSyncing = false;
+  
+  // DOM root reference
+  private rootElement: Element | null = null;
 
   constructor() {
     // Initialize API key from storage
@@ -81,7 +84,7 @@ export class App {
     // Subscribe to auth changes
     authService.onAuthChange(async (user) => {
       this.currentUser = user;
-      this.render();
+      this.fullRender();
       
       if (user) {
         // Sync data when user logs in
@@ -95,7 +98,7 @@ export class App {
     }
     
     // Re-render to show auth state
-    this.render();
+    this.fullRender();
   }
   
   private async syncWithCloud(): Promise<void> {
@@ -103,7 +106,7 @@ export class App {
     
     try {
       this.isSyncing = true;
-      this.render();
+      this.fullRender();
       
       await cloudStorage.performFullSync();
       
@@ -113,7 +116,7 @@ export class App {
       this.showToast('Sync failed', 'error');
     } finally {
       this.isSyncing = false;
-      this.render();
+      this.fullRender();
     }
   }
   
@@ -147,9 +150,17 @@ export class App {
   mount(selector: string): void {
     const root = document.querySelector(selector);
     if (!root) throw new Error(`Element ${selector} not found`);
+    this.rootElement = root;
     root.innerHTML = this.render();
     this.attachEventListeners();
     this.setupResizeListener();
+  }
+  
+  // Full re-render with event listener reattachment
+  private fullRender(): void {
+    if (!this.rootElement) return;
+    this.rootElement.innerHTML = this.render();
+    this.attachEventListeners();
   }
 
   private getMaxColumnsForWidth(width: number): number {
@@ -306,8 +317,11 @@ export class App {
               </button>
             </div>
           ` : `
-            <button class="btn btn-primary w-full" id="open-auth-modal">
+            <button class="btn btn-primary w-full open-auth-modal account-widget-expanded">
               ${icons.user} Sign In
+            </button>
+            <button class="btn btn-primary btn-icon open-auth-modal account-widget-collapsed" title="Sign In">
+              ${icons.user}
             </button>
             <p class="account-hint">Sign in to sync across devices</p>
           `}
@@ -341,6 +355,12 @@ export class App {
           <button class="mobile-nav-item ${this.currentView === 'settings' ? 'active' : ''}" data-view="settings">
             ${icons.settings}
             <span>Settings</span>
+          </button>
+          <button class="mobile-nav-item mobile-account-btn open-auth-modal ${this.currentUser ? 'logged-in' : ''}" ${this.currentUser ? 'disabled' : ''}>
+            ${this.currentUser ? `
+              <span class="mobile-account-avatar">${this.currentUser.email?.charAt(0).toUpperCase() || 'U'}</span>
+            ` : icons.user}
+            <span>${this.currentUser ? 'Synced' : 'Account'}</span>
           </button>
         </div>
       </nav>
@@ -1726,11 +1746,12 @@ export class App {
   }
 
   private attachAuthListeners(): void {
-    // Open auth modal
-    const openAuthBtn = document.getElementById('open-auth-modal');
-    openAuthBtn?.addEventListener('click', () => {
-      this.authModalMode = 'login';
-      this.render();
+    // Open auth modal (both desktop and mobile buttons)
+    document.querySelectorAll('.open-auth-modal').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.authModalMode = 'login';
+        this.fullRender();
+      });
     });
 
     // Sync now button
@@ -1750,7 +1771,7 @@ export class App {
     const closeAuthBtn = document.getElementById('close-auth-modal');
     closeAuthBtn?.addEventListener('click', () => {
       this.authModalMode = null;
-      this.render();
+      this.fullRender();
     });
 
     // Modal overlay click to close
@@ -1758,7 +1779,7 @@ export class App {
     authModal?.addEventListener('click', (e) => {
       if (e.target === authModal) {
         this.authModalMode = null;
-        this.render();
+        this.fullRender();
       }
     });
 
@@ -1771,12 +1792,12 @@ export class App {
       const passwordInput = document.getElementById('auth-password') as HTMLInputElement;
       
       const email = emailInput?.value.trim();
-      const password = passwordInput?.value;
+      const password = passwordInput?.value || '';
       
       if (!email) return;
       
       this.authLoading = true;
-      this.render();
+      this.fullRender();
       
       try {
         if (this.authModalMode === 'magic-link') {
@@ -1785,6 +1806,12 @@ export class App {
           this.showToast('Check your email for the magic link!', 'success');
           this.authModalMode = null;
         } else if (this.authModalMode === 'login') {
+          if (!password) {
+            this.showToast('Password is required', 'error');
+            this.authLoading = false;
+            this.fullRender();
+            return;
+          }
           const { error } = await authService.signIn(email, password);
           if (error) throw error;
           this.showToast('Welcome back!', 'success');
@@ -1800,7 +1827,7 @@ export class App {
         this.showToast(message, 'error');
       } finally {
         this.authLoading = false;
-        this.render();
+        this.fullRender();
       }
     });
 
@@ -1808,25 +1835,25 @@ export class App {
     const switchSignup = document.getElementById('auth-switch-signup');
     switchSignup?.addEventListener('click', () => {
       this.authModalMode = 'signup';
-      this.render();
+      this.fullRender();
     });
 
     const switchLogin = document.getElementById('auth-switch-login');
     switchLogin?.addEventListener('click', () => {
       this.authModalMode = 'login';
-      this.render();
+      this.fullRender();
     });
 
     const switchMagic = document.getElementById('auth-switch-magic');
     switchMagic?.addEventListener('click', () => {
       this.authModalMode = 'magic-link';
-      this.render();
+      this.fullRender();
     });
 
     const switchPassword = document.getElementById('auth-switch-password');
     switchPassword?.addEventListener('click', () => {
       this.authModalMode = 'login';
-      this.render();
+      this.fullRender();
     });
   }
 

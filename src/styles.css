@@ -1485,8 +1485,30 @@ select.input {
   margin-bottom: 0;
 }
 
-.sidebar.collapsed .account-widget {
+/* Collapsed sidebar: hide expanded button, show collapsed button */
+.account-widget-expanded {
+  display: flex;
+}
+
+.account-widget-collapsed {
   display: none;
+}
+
+.sidebar.collapsed .account-widget {
+  padding: var(--space-2);
+  display: flex;
+  justify-content: center;
+}
+
+.sidebar.collapsed .account-widget-expanded,
+.sidebar.collapsed .account-info,
+.sidebar.collapsed .account-actions,
+.sidebar.collapsed .account-hint {
+  display: none;
+}
+
+.sidebar.collapsed .account-widget-collapsed {
+  display: flex;
 }
 
 /* ============================================
@@ -1647,10 +1669,6 @@ select.input {
   text-align: center;
   margin-top: var(--space-2);
   margin-bottom: 0;
-}
-
-.sidebar.collapsed .account-widget {
-  display: none;
 }
 
 /* ============================================
@@ -1955,6 +1973,28 @@ select.input {
 .mobile-nav-item svg {
   width: 24px;
   height: 24px;
+}
+
+/* Mobile Account Button in Nav */
+.mobile-account-btn {
+  position: relative;
+}
+
+.mobile-account-btn.logged-in {
+  color: var(--color-primary);
+}
+
+.mobile-account-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--font-semibold);
+  font-size: var(--text-xs);
 }
 
 /* Mobile Usage Bar */

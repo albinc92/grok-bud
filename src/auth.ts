@@ -79,6 +79,10 @@ class AuthService {
       },
     });
 
+    if (error) {
+      console.error('[Auth] Magic link error:', error.message, error);
+    }
+
     return { error };
   }
 
