@@ -1,6 +1,14 @@
-import type { FavoritePost, AppState } from './types';
+import type { FavoritePost, AppState, UsageRecord, UsageStats } from './types';
 
 const STORAGE_KEY = 'grok-bud-state';
+
+// Model pricing in USD cents per 100 million tokens (from API docs)
+const MODEL_PRICING: Record<string, { prompt: number; completion: number }> = {
+  'grok-4': { prompt: 20000, completion: 100000 },
+  'grok-3': { prompt: 30000, completion: 150000 },
+  'grok-3-mini': { prompt: 3000, completion: 5000 },
+  'grok-imagine-image': { prompt: 100000, completion: 100000 },
+};
 
 export function loadState(): Partial<AppState> {
   try {
@@ -69,4 +77,75 @@ export function getSelectedModel(): string {
 
 export function setSelectedModel(model: string): void {
   saveState({ selectedModel: model });
+}
+
+// Usage tracking functions
+
+export function getUsageStats(): UsageStats {
+  const state = loadState();
+  return state.usage || {
+    totalTokens: 0,
+    totalCost: 0,
+    chatTokens: 0,
+    imageTokens: 0,
+    requestCount: 0,
+    history: [],
+  };
+}
+
+export function calculateCost(model: string, promptTokens: number, completionTokens: number): number {
+  const pricing = MODEL_PRICING[model] || MODEL_PRICING['grok-3'];
+  // Convert from cents per 100M tokens to dollars
+  const promptCost = (promptTokens / 100_000_000) * pricing.prompt / 100;
+  const completionCost = (completionTokens / 100_000_000) * pricing.completion / 100;
+  return promptCost + completionCost;
+}
+
+export function recordUsage(
+  endpoint: 'chat' | 'image',
+  model: string,
+  promptTokens: number,
+  completionTokens: number,
+  totalTokens: number
+): void {
+  const stats = getUsageStats();
+  const estimatedCost = calculateCost(model, promptTokens, completionTokens);
+
+  const record: UsageRecord = {
+    timestamp: Date.now(),
+    endpoint,
+    model,
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    estimatedCost,
+  };
+
+  stats.totalTokens += totalTokens;
+  stats.totalCost += estimatedCost;
+  stats.requestCount += 1;
+  
+  if (endpoint === 'chat') {
+    stats.chatTokens += totalTokens;
+  } else {
+    stats.imageTokens += totalTokens;
+  }
+
+  // Keep last 100 records
+  stats.history = [record, ...stats.history].slice(0, 100);
+
+  saveState({ usage: stats });
+}
+
+export function resetUsageStats(): void {
+  saveState({
+    usage: {
+      totalTokens: 0,
+      totalCost: 0,
+      chatTokens: 0,
+      imageTokens: 0,
+      requestCount: 0,
+      history: [],
+    },
+  });
 }

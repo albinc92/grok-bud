@@ -26,6 +26,8 @@ export class App {
   }
 
   private render(): string {
+    const usage = storage.getUsageStats();
+    
     return `
       <aside class="sidebar">
         <div class="sidebar-logo">
@@ -50,12 +52,41 @@ export class App {
             <span>Settings</span>
           </button>
         </nav>
+        <div class="usage-widget">
+          <div class="usage-header">
+            ${icons.zap}
+            <span>Usage</span>
+          </div>
+          <div class="usage-stats">
+            <div class="usage-stat">
+              <span class="usage-value">${this.formatTokens(usage.totalTokens)}</span>
+              <span class="usage-label">tokens</span>
+            </div>
+            <div class="usage-stat">
+              <span class="usage-value">$${usage.totalCost.toFixed(4)}</span>
+              <span class="usage-label">est. cost</span>
+            </div>
+            <div class="usage-stat">
+              <span class="usage-value">${usage.requestCount}</span>
+              <span class="usage-label">requests</span>
+            </div>
+          </div>
+        </div>
       </aside>
       <main class="main-content">
         ${this.renderCurrentView()}
       </main>
       <div class="toast-container" id="toast-container"></div>
     `;
+  }
+
+  private formatTokens(tokens: number): string {
+    if (tokens >= 1_000_000) {
+      return (tokens / 1_000_000).toFixed(1) + 'M';
+    } else if (tokens >= 1_000) {
+      return (tokens / 1_000).toFixed(1) + 'K';
+    }
+    return tokens.toString();
   }
 
   private renderCurrentView(): string {
@@ -260,6 +291,14 @@ export class App {
         </section>
 
         <section class="settings-section">
+          <h3>${icons.zap} Usage & Costs</h3>
+          ${this.renderUsageDetails()}
+          <button class="btn btn-secondary" id="reset-usage" style="margin-top: 16px;">
+            ${icons.trash} Reset Usage Stats
+          </button>
+        </section>
+
+        <section class="settings-section">
           <h3>${icons.grid} Data Management</h3>
           <p style="color: var(--color-text-secondary); margin-bottom: 16px;">
             You have ${storage.getFavorites().length} saved favorites.
@@ -284,6 +323,63 @@ export class App {
         </section>
       </div>
     `;
+  }
+
+  private renderUsageDetails(): string {
+    const usage = storage.getUsageStats();
+    
+    return `
+      <div class="usage-details">
+        <div class="usage-grid">
+          <div class="usage-card">
+            <div class="usage-card-value">${this.formatTokens(usage.totalTokens)}</div>
+            <div class="usage-card-label">Total Tokens</div>
+          </div>
+          <div class="usage-card">
+            <div class="usage-card-value">$${usage.totalCost.toFixed(4)}</div>
+            <div class="usage-card-label">Estimated Cost</div>
+          </div>
+          <div class="usage-card">
+            <div class="usage-card-value">${usage.requestCount}</div>
+            <div class="usage-card-label">API Requests</div>
+          </div>
+          <div class="usage-card">
+            <div class="usage-card-value">${this.formatTokens(usage.chatTokens)}</div>
+            <div class="usage-card-label">Chat Tokens</div>
+          </div>
+          <div class="usage-card">
+            <div class="usage-card-value">${this.formatTokens(usage.imageTokens)}</div>
+            <div class="usage-card-label">Image Tokens</div>
+          </div>
+        </div>
+        ${usage.history.length > 0 ? `
+          <h4 style="margin-top: 24px; margin-bottom: 12px; color: var(--color-text-secondary);">Recent Activity</h4>
+          <div class="usage-history">
+            ${usage.history.slice(0, 10).map(record => `
+              <div class="usage-history-item">
+                <span class="usage-history-type">${record.endpoint === 'chat' ? icons.messageSquare : icons.image}</span>
+                <span class="usage-history-model">${record.model}</span>
+                <span class="usage-history-tokens">${this.formatTokens(record.totalTokens)} tokens</span>
+                <span class="usage-history-cost">$${record.estimatedCost.toFixed(6)}</span>
+                <span class="usage-history-time">${this.formatTime(record.timestamp)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <p style="color: var(--color-text-muted); margin-top: 16px;">No usage recorded yet. Start chatting or generating images!</p>
+        `}
+      </div>
+    `;
+  }
+
+  private formatTime(timestamp: number): string {
+    const now = Date.now();
+    const diff = now - timestamp;
+    
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return new Date(timestamp).toLocaleDateString();
   }
 
   private attachEventListeners(): void {
@@ -545,6 +641,15 @@ export class App {
       if (confirm('This will delete all your favorites. Are you sure?')) {
         localStorage.removeItem('grok-bud-state');
         this.showToast('All data cleared', 'success');
+        this.refreshView();
+      }
+    });
+
+    const resetUsageBtn = document.getElementById('reset-usage');
+    resetUsageBtn?.addEventListener('click', () => {
+      if (confirm('Reset all usage statistics?')) {
+        storage.resetUsageStats();
+        this.showToast('Usage stats reset', 'success');
         this.refreshView();
       }
     });

@@ -633,4 +633,141 @@ select.input {
   #app {
     flex-direction: column;
   }
+
+  .usage-widget {
+    display: none;
+  }
+}
+
+/* Usage Widget (Sidebar) */
+.usage-widget {
+  margin-top: auto;
+  padding: 16px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.usage-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.usage-header svg {
+  width: 14px;
+  height: 14px;
+}
+
+.usage-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.usage-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.usage-value {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.usage-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Usage Details (Settings Page) */
+.usage-details {
+  margin-top: 16px;
+}
+
+.usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.usage-card {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.usage-card-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 4px;
+}
+
+.usage-card-label {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.usage-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.usage-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.usage-history-type {
+  display: flex;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+.usage-history-type svg {
+  width: 16px;
+  height: 16px;
+}
+
+.usage-history-model {
+  color: var(--color-text-secondary);
+  flex: 1;
+}
+
+.usage-history-tokens {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.usage-history-cost {
+  color: var(--color-success);
+  font-weight: 500;
+  min-width: 80px;
+  text-align: right;
+}
+
+.usage-history-time {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  min-width: 60px;
+  text-align: right;
 }

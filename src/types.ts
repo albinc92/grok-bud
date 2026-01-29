@@ -78,10 +78,38 @@ export interface FavoritePost {
   tags: string[];
 }
 
+export interface UsageRecord {
+  timestamp: number;
+  endpoint: 'chat' | 'image';
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  estimatedCost: number; // in USD
+}
+
+export interface UsageStats {
+  totalTokens: number;
+  totalCost: number;
+  chatTokens: number;
+  imageTokens: number;
+  requestCount: number;
+  history: UsageRecord[];
+}
+
+export interface ModelPricing {
+  id: string;
+  promptTextTokenPrice: number; // USD cents per 100M tokens
+  completionTextTokenPrice: number;
+  promptImageTokenPrice: number;
+  generatedImageTokenPrice: number;
+}
+
 export interface AppState {
   favorites: FavoritePost[];
   currentView: 'gallery' | 'chat' | 'image-gen' | 'settings';
   apiKey: string | null;
   selectedModel: string;
   isLoading: boolean;
+  usage: UsageStats;
 }

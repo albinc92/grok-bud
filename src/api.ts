@@ -6,6 +6,7 @@ import type {
   ModelsResponse,
   GrokMessage
 } from './types';
+import { recordUsage } from './storage';
 
 const API_BASE_URL = 'https://api.x.ai/v1';
 
@@ -62,10 +63,23 @@ class GrokApiClient {
       ...options,
     };
 
-    return this.request<ChatCompletionResponse>('/chat/completions', {
+    const response = await this.request<ChatCompletionResponse>('/chat/completions', {
       method: 'POST',
       body: JSON.stringify(body),
     });
+
+    // Track usage
+    if (response.usage) {
+      recordUsage(
+        'chat',
+        model,
+        response.usage.prompt_tokens,
+        response.usage.completion_tokens,
+        response.usage.total_tokens
+      );
+    }
+
+    return response;
   }
 
   async generateImage(
@@ -81,10 +95,16 @@ class GrokApiClient {
       ...options,
     };
 
-    return this.request<ImageGenerationResponse>('/images/generations', {
+    const response = await this.request<ImageGenerationResponse>('/images/generations', {
       method: 'POST',
       body: JSON.stringify(body),
     });
+
+    // Track usage for image generation (estimate tokens based on typical usage)
+    const estimatedTokens = 1000 * (options.n || 1); // Rough estimate per image
+    recordUsage('image', model, estimatedTokens, 0, estimatedTokens);
+
+    return response;
   }
 
   async validateApiKey(): Promise<boolean> {
