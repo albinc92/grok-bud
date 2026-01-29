@@ -367,12 +367,17 @@ export class App {
             ${icons.settings}
             <span>Settings</span>
           </button>
-          <button class="mobile-nav-item mobile-account-btn open-auth-modal ${this.currentUser ? 'logged-in' : ''}" ${this.currentUser ? 'disabled' : ''}>
-            ${this.currentUser ? `
+          ${this.currentUser ? `
+            <button class="mobile-nav-item mobile-account-btn logged-in" id="mobile-account-info">
               <span class="mobile-account-avatar">${this.currentUser.email?.charAt(0).toUpperCase() || 'U'}</span>
-            ` : icons.user}
-            <span>${this.currentUser ? 'Synced' : 'Account'}</span>
-          </button>
+              <span>${this.isSyncing ? 'Syncing' : 'Synced'}</span>
+            </button>
+          ` : `
+            <button class="mobile-nav-item mobile-account-btn open-auth-modal">
+              ${icons.user}
+              <span>Account</span>
+            </button>
+          `}
         </div>
       </nav>
 
